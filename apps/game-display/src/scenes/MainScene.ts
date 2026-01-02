@@ -241,7 +241,7 @@ export class MainScene extends Phaser.Scene {
     const playerData = this.playerSprites.get(player.id);
     if (!playerData) return;
 
-    const { container, coinText, nameText } = playerData;
+    const { container, sprite, coinText, currentDirection } = playerData;
 
     // Smooth movement using tweens
     this.tweens.add({
@@ -251,6 +251,44 @@ export class MainScene extends Phaser.Scene {
       duration: 100,
       ease: 'Linear'
     });
+
+    // Calculate velocity magnitude
+    const speed = Math.sqrt(
+      player.customData.vx * player.customData.vx +
+      player.customData.vy * player.customData.vy
+    );
+
+    // Determine direction (prioritize horizontal)
+    let direction = currentDirection;
+    if (player.customData.vx !== 0) {
+      direction = player.customData.vx > 0 ? 'right' : 'left';
+    } else if (player.customData.vy !== 0) {
+      direction = player.customData.vy > 0 ? 'down' : 'up';
+    }
+
+    // Store the new direction
+    playerData.currentDirection = direction;
+
+    // Determine animation state
+    const movementThreshold = 1;
+    const state = speed > movementThreshold ? 'walk' : 'idle';
+    const animationKey = `${state}-${direction}`;
+
+    // Play animation if different from current
+    if (sprite.anims.currentAnim?.key !== animationKey) {
+      sprite.play(animationKey, true);
+    }
+
+    // Adjust animation speed based on velocity
+    if (state === 'walk') {
+      const maxSpeed = 250; // Should match MovementPlayer.baseMaxSpeed
+      const normalizedSpeed = Math.min(speed / maxSpeed, 1);
+      const baseFrameRate = 8;
+      const frameRate = Math.max(2, normalizedSpeed * baseFrameRate);
+      sprite.anims.timeScale = frameRate / baseFrameRate;
+    } else {
+      sprite.anims.timeScale = 1.0; // Reset to normal speed for idle
+    }
 
     // Update coin counter
     coinText.setText(`Coins: ${player.customData.coins}`);
