@@ -67,6 +67,9 @@ export class MainScene extends Phaser.Scene {
     // Add grid for visual reference
     this.createGrid();
 
+    // Create sprite animations
+    this.createAnimations();
+
     // Listen for state updates
     this.events.on('state-update', this.handleStateUpdate, this);
   }
@@ -88,6 +91,66 @@ export class MainScene extends Phaser.Scene {
     for (let y = 0; y <= height; y += gridSize) {
       graphics.lineBetween(0, y, width, y);
     }
+  }
+
+  private createAnimations(): void {
+    // Idle animations (frames 0-1 of each row)
+    this.anims.create({
+      key: 'idle-down',
+      frames: this.anims.generateFrameNumbers('character', { start: 0, end: 1 }),
+      frameRate: 4,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'idle-up',
+      frames: this.anims.generateFrameNumbers('character', { start: 4, end: 5 }),
+      frameRate: 4,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'idle-left',
+      frames: this.anims.generateFrameNumbers('character', { start: 8, end: 9 }),
+      frameRate: 4,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'idle-right',
+      frames: this.anims.generateFrameNumbers('character', { start: 12, end: 13 }),
+      frameRate: 4,
+      repeat: -1
+    });
+
+    // Walk animations (frames 2-3 of each row)
+    this.anims.create({
+      key: 'walk-down',
+      frames: this.anims.generateFrameNumbers('character', { start: 2, end: 3 }),
+      frameRate: 8,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'walk-up',
+      frames: this.anims.generateFrameNumbers('character', { start: 6, end: 7 }),
+      frameRate: 8,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'walk-left',
+      frames: this.anims.generateFrameNumbers('character', { start: 10, end: 11 }),
+      frameRate: 8,
+      repeat: -1
+    });
+
+    this.anims.create({
+      key: 'walk-right',
+      frames: this.anims.generateFrameNumbers('character', { start: 14, end: 15 }),
+      frameRate: 8,
+      repeat: -1
+    });
   }
 
   private handleStateUpdate(state: GameState): void {
