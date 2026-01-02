@@ -5,6 +5,8 @@ import path from 'path';
 export default defineConfig({
   base: '/controller/',
   plugins: [react()],
+  envDir: '../../',
+  envPrefix: ['VITE_'],
   server: {
     port: 5174,
     host: true

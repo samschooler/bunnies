@@ -1,5 +1,13 @@
-// Get server URL from environment or use default
-const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+import { URLBuilder } from '@party-game/shared-types';
+
+// Create URLBuilder instance
+const urlBuilder = new URLBuilder({
+  serverUrl: import.meta.env.VITE_GAME_SERVER_URL,
+  displayUrl: import.meta.env.VITE_GAME_DISPLAY_URL,
+  controllerUrl: import.meta.env.VITE_GAME_CONTROLLER_URL
+});
+
+const serverUrl = urlBuilder.getServerUrl();
 
 const createBtn = document.getElementById('createBtn') as HTMLButtonElement;
 const joinBtn = document.getElementById('joinBtn') as HTMLButtonElement;
@@ -46,12 +54,7 @@ function joinGame() {
   }
 
   // Redirect to controller (phone interface)
-  // In dev mode, controller runs on port 5174
-  const isDev = import.meta.env.DEV;
-  const controllerUrl = isDev
-    ? `http://localhost:5174/controller/${roomCode}`
-    : `/controller/${roomCode}`;
-
+  const controllerUrl = urlBuilder.getControllerUrl(roomCode);
   window.location.href = controllerUrl;
 }
 

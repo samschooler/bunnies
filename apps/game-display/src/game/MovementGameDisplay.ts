@@ -1,56 +1,26 @@
 import { BaseGameDisplay } from '@party-game/game-framework/client';
-import { GameState, PlayerData } from '@party-game/shared-types';
+import { GameState, PlayerData, URLBuilder } from '@party-game/shared-types';
 import QRCode from 'qrcode';
 
 export class MovementGameDisplay extends BaseGameDisplay {
   private game: Phaser.Game;
   private playerListElement: HTMLElement;
   private playerCountElement: HTMLElement;
-  private serverUrl: string;
+  private urlBuilder: URLBuilder;
   private currentRoomCode: string | null = null;
-  private useNetworkIp: boolean = false;
 
-  constructor(serverUrl: string, game: Phaser.Game) {
+  constructor(serverUrl: string, game: Phaser.Game, urlBuilder: URLBuilder) {
     super(serverUrl);
-    this.serverUrl = serverUrl;
+    this.urlBuilder = urlBuilder;
     this.game = game;
     this.playerListElement = document.getElementById('players')!;
     this.playerCountElement = document.getElementById('player-count')!;
-
-    // Load saved preference
-    const saved = localStorage.getItem('qr-use-network-ip');
-    this.useNetworkIp = saved === 'true';
-
-    // Setup toggle button
-    const toggleButton = document.getElementById('qr-toggle');
-    if (toggleButton) {
-      toggleButton.addEventListener('click', () => this.toggleQRMode());
-      this.updateToggleButton();
-    }
   }
 
   onRoomCreated(roomCode: string): void {
     console.log('Room created:', roomCode);
     this.currentRoomCode = roomCode;
     this.displayQRCode(roomCode);
-  }
-
-  private toggleQRMode(): void {
-    this.useNetworkIp = !this.useNetworkIp;
-    localStorage.setItem('qr-use-network-ip', String(this.useNetworkIp));
-    this.updateToggleButton();
-
-    // Regenerate QR code if room exists
-    if (this.currentRoomCode) {
-      this.displayQRCode(this.currentRoomCode);
-    }
-  }
-
-  private updateToggleButton(): void {
-    const button = document.getElementById('qr-toggle');
-    if (button) {
-      button.textContent = this.useNetworkIp ? 'Use Localhost' : 'Use Domain';
-    }
   }
 
   onStateUpdate(state: GameState): void {
@@ -75,8 +45,8 @@ export class MovementGameDisplay extends BaseGameDisplay {
     const qrCanvas = document.getElementById('qr-code') as HTMLCanvasElement;
     const roomCodeElement = document.getElementById('room-code')!;
 
-    // Get local network URL
-    const url = this.getControllerUrl(roomCode);
+    // Get controller URL from URLBuilder
+    const url = this.urlBuilder.getControllerUrl(roomCode);
 
     try {
       await QRCode.toCanvas(qrCanvas, url, {
@@ -92,43 +62,6 @@ export class MovementGameDisplay extends BaseGameDisplay {
       qrContainer.style.display = 'block';
     } catch (err) {
       console.error('Failed to generate QR code:', err);
-    }
-  }
-
-  private getControllerUrl(roomCode: string): string {
-    // Use env var if explicitly set
-    if (import.meta.env.VITE_CONTROLLER_URL) {
-      return `${import.meta.env.VITE_CONTROLLER_URL}/${roomCode}`;
-    }
-
-    // In dev mode
-    if (!import.meta.env.PROD) {
-      if (this.useNetworkIp) {
-        // Use the server URL from env (could be tunnel URL like play.sam.ink)
-        const serverUrl = new URL(this.serverUrl);
-        // If it's https (tunnel), keep https and use default port
-        if (serverUrl.protocol === 'https:') {
-          return `${serverUrl.origin}/${roomCode}`;
-        }
-        // If it's http with network IP, use port 5174
-        return `http://${serverUrl.hostname}:5174/${roomCode}`;
-      } else {
-        // Localhost mode: always use localhost:5174 for Vite dev server
-        return `http://localhost:5174/${roomCode}`;
-      }
-    }
-
-    // In production, controller is served from same server
-    const protocol = window.location.protocol;
-    const port = window.location.port || '3000';
-
-    if (this.useNetworkIp) {
-      // Use the network IP provided by the server or window location
-      const hostname = window.location.hostname || `${this.serverNetworkIp}:${port}`;
-      return `${protocol}//${hostname}/controller/${roomCode}`;
-    } else {
-      // Use localhost
-      return `${protocol}//localhost:${port}/controller/${roomCode}`;
     }
   }
 

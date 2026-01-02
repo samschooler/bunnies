@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { URLBuilder } from '@party-game/shared-types';
 import { MovementController } from '../game/MovementController';
 import NameEntry from '../components/NameEntry';
 import GameController from '../components/GameController';
@@ -15,7 +16,12 @@ export default function ControllerPage() {
   useEffect(() => {
     if (!roomCode) return;
 
-    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+    const urlBuilder = new URLBuilder({
+      serverUrl: import.meta.env.VITE_GAME_SERVER_URL,
+      displayUrl: import.meta.env.VITE_GAME_DISPLAY_URL,
+      controllerUrl: import.meta.env.VITE_GAME_CONTROLLER_URL
+    });
+    const serverUrl = urlBuilder.getServerUrl();
     const ctrl = new MovementController(serverUrl, roomCode, {
       onJoined: (id) => {
         setPlayerId(id);

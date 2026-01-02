@@ -36,25 +36,6 @@
       color: #333;
       letter-spacing: 3px;
     }
-    .qr-toggle {
-      margin-top: 10px;
-      padding: 8px 12px;
-      width: 100%;
-      background: #4ECDC4;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .qr-toggle:hover {
-      background: #3ab8af;
-    }
-    .qr-toggle:active {
-      transform: scale(0.98);
-    }
     #player-list {
       position: fixed;
       top: 20px;
@@ -91,7 +72,6 @@
   <div id="qr-container" style="display: none;">
     <canvas id="qr-code"></canvas>
     <div id="room-code"></div>
-    <button id="qr-toggle" class="qr-toggle">Use Network IP</button>
   </div>
   <div id="player-list">
     <h3>Players (<span id="player-count">0</span>)</h3>

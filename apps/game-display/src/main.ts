@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { URLBuilder } from '@party-game/shared-types';
 import { MainScene } from './scenes/MainScene';
 import { MovementGameDisplay } from './game/MovementGameDisplay';
 
@@ -17,8 +18,14 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const game = new Phaser.Game(config);
 
-// Get server URL from environment or use default
-const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000';
+// Create URLBuilder instance
+const urlBuilder = new URLBuilder({
+  serverUrl: import.meta.env.VITE_GAME_SERVER_URL,
+  displayUrl: import.meta.env.VITE_GAME_DISPLAY_URL,
+  controllerUrl: import.meta.env.VITE_GAME_CONTROLLER_URL
+});
+
+const serverUrl = urlBuilder.getServerUrl();
 
 // Parse room code from URL path
 const path = window.location.pathname;
@@ -28,7 +35,7 @@ const roomCode = roomCodeMatch ? roomCodeMatch[1].toUpperCase() : null;
 // Only initialize game if we have a room code
 if (roomCode) {
   // Initialize game display connection
-  const gameDisplay = new MovementGameDisplay(serverUrl, game);
+  const gameDisplay = new MovementGameDisplay(serverUrl, game, urlBuilder);
 
   // Join room with the code from URL
   console.log(`Joining room: ${roomCode}`);

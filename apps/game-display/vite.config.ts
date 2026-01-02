@@ -6,6 +6,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   base: '/',
+  envDir: '../../',
+  envPrefix: ['VITE_'],
   build: {
     rollupOptions: {
       input: {
