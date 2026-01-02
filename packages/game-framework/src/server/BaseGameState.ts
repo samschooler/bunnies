@@ -38,9 +38,13 @@ export abstract class BaseGameState {
       players[id] = player.getState();
     });
 
+    // Deep copy gameData to create a true snapshot
+    const gameData = this.getGameData();
+    const gameDataSnapshot = JSON.parse(JSON.stringify(gameData));
+
     return {
       players,
-      gameData: this.getGameData(),
+      gameData: gameDataSnapshot,
       timestamp: Date.now()
     };
   }
@@ -75,12 +79,12 @@ export abstract class BaseGameState {
       delta.players = playerDeltas;
     }
 
-    // Calculate game data deltas (shallow comparison)
+    // Calculate game data deltas (deep comparison to detect array mutations)
     const gameDataDeltas: Partial<Record<string, any>> = {};
     let hasGameDataChanges = false;
 
     Object.keys(currentState.gameData).forEach(key => {
-      if (currentState.gameData[key] !== this.previousState!.gameData[key]) {
+      if (JSON.stringify(currentState.gameData[key]) !== JSON.stringify(this.previousState!.gameData[key])) {
         gameDataDeltas[key] = currentState.gameData[key];
         hasGameDataChanges = true;
       }

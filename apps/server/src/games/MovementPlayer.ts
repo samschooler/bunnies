@@ -1,5 +1,5 @@
 import { BasePlayer } from '@party-game/game-framework/server';
-import { PlayerData } from '@party-game/shared-types';
+import { PlayerData, STORE_CONFIG, calculateUpgradeCost } from '@party-game/shared-types';
 import { ColorGenerator } from '@party-game/game-framework';
 
 interface MovementPlayerData extends PlayerData {
@@ -62,34 +62,44 @@ export class MovementPlayer extends BasePlayer {
   }
 
   purchaseUpgrade(upgradeType: string): boolean {
-    if (upgradeType === 'size') {
-      const cost = Math.floor(this.size * 30);
+    // Handle regular upgrades
+    const upgrade = STORE_CONFIG.upgrades[upgradeType];
+    if (upgrade) {
+      const cost = calculateUpgradeCost(upgradeType, {
+        size: this.size,
+        speed: this.speedUpgrade
+      });
+
       if (this.coins >= cost) {
         this.coins -= cost;
-        this.size += 0.2;
+        // Apply the upgrade effect
+        (this as any)[upgrade.effect.property] += upgrade.effect.increment;
         return true;
       }
-    } else if (upgradeType === 'speed') {
-      const cost = Math.floor(this.speedUpgrade * 25);
-      if (this.coins >= cost) {
-        this.coins -= cost;
-        this.speedUpgrade += 0.2;
-        return true;
-      }
-    } else if (upgradeType.startsWith('color:')) {
+      return false;
+    }
+
+    // Handle color purchases
+    if (upgradeType.startsWith('color:')) {
       const color = upgradeType.substring(6);
-      const cost = 50;
-      if (this.coins >= cost && !this.ownedColors.has(color)) {
-        this.coins -= cost;
-        this.ownedColors.add(color);
-        this.color = color;
-        return true;
-      } else if (this.ownedColors.has(color)) {
+      const colorConfig = STORE_CONFIG.premiumColors.find(c => c.color === color);
+
+      if (!colorConfig) return false;
+
+      if (this.ownedColors.has(color)) {
         // Already owned, just switch to it
         this.color = color;
         return true;
       }
+
+      if (this.coins >= colorConfig.cost) {
+        this.coins -= colorConfig.cost;
+        this.ownedColors.add(color);
+        this.color = color;
+        return true;
+      }
     }
+
     return false;
   }
 
