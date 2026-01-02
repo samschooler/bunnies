@@ -281,11 +281,13 @@ export class MainScene extends Phaser.Scene {
 
     // Adjust animation speed based on velocity
     if (state === 'walk') {
-      const maxSpeed = 250; // Should match MovementPlayer.baseMaxSpeed
-      const normalizedSpeed = Math.min(speed / maxSpeed, 1);
-      const baseFrameRate = 8;
-      const frameRate = Math.max(2, normalizedSpeed * baseFrameRate);
-      sprite.anims.timeScale = frameRate / baseFrameRate;
+      // Use a fixed reference speed for animation scaling
+      // This ensures consistent animation speed regardless of upgrades
+      const referenceSpeed = 250; // MovementPlayer.baseMaxSpeed
+      const normalizedSpeed = Math.min(speed / referenceSpeed, 2.0); // Allow up to 2x speed
+      // timeScale: 0.25 at minimum (25% speed), up to 2.0 for upgraded players
+      const minTimeScale = 0.25;
+      sprite.anims.timeScale = Math.max(minTimeScale, normalizedSpeed);
     } else {
       sprite.anims.timeScale = 1.0; // Reset to normal speed for idle
     }
