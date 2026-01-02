@@ -20,10 +20,10 @@ interface MovementPlayerData {
 
 interface PlayerContainer {
   container: Phaser.GameObjects.Container;
-  particles: Phaser.GameObjects.Particles.ParticleEmitter;
+  sprite: Phaser.GameObjects.Sprite;
   nameText: Phaser.GameObjects.Text;
   coinText: Phaser.GameObjects.Text;
-  circle: Phaser.GameObjects.Arc;
+  currentDirection: string;
 }
 
 export class MainScene extends Phaser.Scene {
