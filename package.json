@@ -1,0 +1,32 @@
+{
+  "name": "party-game-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:server": "turbo run dev --filter=@party-game/server",
+    "dev:display": "turbo run dev --filter=@party-game/game-display",
+    "dev:controller": "turbo run dev --filter=@party-game/controller",
+    "build": "turbo run build",
+    "build:server": "turbo run build --filter=@party-game/server",
+    "build:display": "turbo run build --filter=@party-game/game-display",
+    "build:controller": "turbo run build --filter=@party-game/controller",
+    "start": "NODE_ENV=production node apps/server/dist/index.js",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}

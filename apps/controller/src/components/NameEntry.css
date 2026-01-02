@@ -1,0 +1,56 @@
+.name-entry {
+  width: 100%;
+  padding: 20px;
+}
+
+.name-entry-content {
+  max-width: 400px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.room-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  margin-bottom: 30px;
+  color: var(--primary);
+}
+
+.name-entry h2 {
+  margin-bottom: 30px;
+  font-size: 28px;
+}
+
+.name-entry form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.name-input {
+  padding: 18px;
+  font-size: 18px;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.submit-button {
+  padding: 18px;
+  font-size: 18px;
+  font-weight: bold;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border-radius: 12px;
+  transition: transform 0.2s;
+}
+
+.submit-button:active {
+  transform: scale(0.95);
+}

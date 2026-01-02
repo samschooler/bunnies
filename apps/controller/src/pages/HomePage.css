@@ -1,0 +1,75 @@
+.home-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: var(--background);
+}
+
+.home-content {
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.title {
+  font-size: 48px;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  margin-bottom: 40px;
+  font-size: 16px;
+}
+
+.join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.room-input {
+  padding: 18px;
+  font-size: 20px;
+  text-align: center;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.room-input::placeholder {
+  color: var(--text-dim);
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: normal;
+}
+
+.join-button {
+  padding: 18px;
+  font-size: 18px;
+  font-weight: bold;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border-radius: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.join-button:active {
+  transform: scale(0.95);
+}
+
+.instructions {
+  margin-top: 40px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.6;
+}

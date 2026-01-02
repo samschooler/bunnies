@@ -1,0 +1,265 @@
+.game-controller {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+.controller-header {
+  text-align: center;
+  margin-bottom: 40px;
+  position: relative;
+}
+
+.controller-header h3 {
+  font-size: 24px;
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+
+.coin-display {
+  font-size: 18px;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.coin-count {
+  color: #FFD700;
+  font-weight: bold;
+  font-size: 22px;
+}
+
+.store-button {
+  background: var(--primary);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.store-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px var(--primary);
+}
+
+.dpad-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 100px);
+  grid-template-rows: repeat(3, 100px);
+  gap: 10px;
+  user-select: none;
+}
+
+.dpad-button {
+  background: var(--surface);
+  color: var(--text);
+  font-size: 32px;
+  border-radius: 12px;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.dpad-button:active,
+.dpad-button.active {
+  background: var(--primary);
+  transform: scale(0.9);
+  box-shadow: 0 0 20px var(--primary);
+}
+
+.dpad-button.up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.dpad-button.left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.dpad-center {
+  grid-column: 2;
+  grid-row: 2;
+  background: var(--background);
+  border-radius: 50%;
+  border: 3px solid var(--surface);
+}
+
+.dpad-button.right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.dpad-button.down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.store-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.store-content {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 30px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.store-content h2 {
+  color: var(--primary);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.store-items {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.store-item {
+  background: var(--background);
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid var(--primary);
+}
+
+.store-item h3 {
+  color: var(--primary);
+  margin-bottom: 10px;
+}
+
+.store-item p {
+  color: var(--text);
+  margin: 5px 0;
+}
+
+.store-item button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  background: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.store-item button:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 0 15px var(--primary);
+}
+
+.store-item button:disabled {
+  background: #555;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.store-section {
+  background: var(--background);
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid var(--primary);
+}
+
+.store-section h3 {
+  color: var(--primary);
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 15px;
+}
+
+.color-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-preview {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 3px solid var(--primary);
+}
+
+.color-item span {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.color-item button {
+  width: 100%;
+  padding: 8px;
+  background: var(--primary);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.color-item button:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.color-item button:disabled {
+  background: #555;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.close-store {
+  width: 100%;
+  padding: 12px;
+  margin-top: 20px;
+  background: #d9534f;
+  color: white;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.close-store:hover {
+  background: #c9302c;
+  transform: scale(1.02);
+}

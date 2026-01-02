@@ -1,0 +1,21 @@
+:root {
+  --primary: #4ECDC4;
+  --secondary: #FF6B6B;
+  --background: #1a1a2e;
+  --surface: #16213e;
+  --text: #ffffff;
+  --text-dim: #a0a0a0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+input {
+  font-family: inherit;
+  border: none;
+  outline: none;
+}
