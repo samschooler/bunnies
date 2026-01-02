@@ -48,13 +48,6 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
-    // Create particle texture
-    const graphics = this.add.graphics();
-    graphics.fillStyle(0xffffff, 1);
-    graphics.fillCircle(4, 4, 4);
-    graphics.generateTexture('particle', 8, 8);
-    graphics.destroy();
-
     // Add background
     this.add.rectangle(
       this.cameras.main.width / 2,
@@ -169,7 +162,6 @@ export class MainScene extends Phaser.Scene {
     this.playerSprites.forEach((playerData, playerId) => {
       if (!players[playerId]) {
         playerData.container.destroy();
-        playerData.particles.destroy();
         this.playerSprites.delete(playerId);
       }
     });
@@ -205,53 +197,51 @@ export class MainScene extends Phaser.Scene {
       player.customData.y
     );
 
-    const baseRadius = 20;
-    const radius = baseRadius * player.customData.size;
+    // Create animated sprite
+    const sprite = this.add.sprite(0, 0, 'character');
+    sprite.setScale(2.0); // 2x scale for pixel art
+    sprite.setOrigin(0.5, 0.5);
+    sprite.play('idle-down'); // Default animation
 
-    // Circle sprite
-    const circle = this.add.circle(0, 0, radius, Phaser.Display.Color.HexStringToColor(player.color).color);
+    // Calculate sprite dimensions for text positioning
+    const spriteHeight = sprite.displayHeight;
 
-    // Name text (positioned below the circle)
-    const nameY = radius + 10;
+    // Name text (positioned above the sprite)
+    const nameY = -(spriteHeight / 2) - 8;
     const nameText = this.add.text(0, nameY, player.name, {
       fontSize: '14px',
       color: '#ffffff',
       backgroundColor: '#00000088',
       padding: { x: 4, y: 2 }
     });
-    nameText.setOrigin(0.5);
+    nameText.setOrigin(0.5, 1); // Bottom-center origin
 
-    // Coin counter text
-    const coinY = nameY + 16;
+    // Coin counter text (above name text)
+    const coinY = nameY - 16;
     const coinText = this.add.text(0, coinY, `Coins: ${player.customData.coins}`, {
       fontSize: '12px',
       color: '#FFD700',
       backgroundColor: '#00000088',
       padding: { x: 4, y: 2 }
     });
-    coinText.setOrigin(0.5);
+    coinText.setOrigin(0.5, 1); // Bottom-center origin
 
-    container.add([circle, nameText, coinText]);
+    container.add([sprite, nameText, coinText]);
 
-    // Create particle emitter for movement trail
-    const particles = this.add.particles(0, 0, 'particle', {
-      speed: { min: 10, max: 50 },
-      scale: { start: 0.5 * player.customData.size, end: 0 },
-      alpha: { start: 0.8, end: 0 },
-      lifespan: 300,
-      tint: Phaser.Display.Color.HexStringToColor(player.color).color,
-      frequency: 30,
-      emitting: false
+    this.playerSprites.set(player.id, {
+      container,
+      sprite,
+      nameText,
+      coinText,
+      currentDirection: 'down'
     });
-
-    this.playerSprites.set(player.id, { container, particles, nameText, coinText, circle });
   }
 
   private updatePlayerSprite(player: MovementPlayerData): void {
     const playerData = this.playerSprites.get(player.id);
     if (!playerData) return;
 
-    const { container, particles, coinText, nameText, circle } = playerData;
+    const { container, coinText, nameText } = playerData;
 
     // Smooth movement using tweens
     this.tweens.add({
@@ -261,27 +251,6 @@ export class MainScene extends Phaser.Scene {
       duration: 100,
       ease: 'Linear'
     });
-
-    // Update particle position to follow player
-    particles.setPosition(player.customData.x, player.customData.y);
-
-    // Enable particles if moving, disable if not
-    const isMoving = Math.abs(player.customData.vx) > 1 || Math.abs(player.customData.vy) > 1;
-    particles.emitting = isMoving;
-
-    // Update player size
-    const baseRadius = 20;
-    const radius = baseRadius * player.customData.size;
-    circle.setRadius(radius);
-
-    // Update text positions based on size
-    const nameY = radius + 10;
-    nameText.setY(nameY);
-    coinText.setY(nameY + 16);
-
-    // Update player color
-    circle.setFillStyle(Phaser.Display.Color.HexStringToColor(player.color).color);
-    particles.particleTint = Phaser.Display.Color.HexStringToColor(player.color).color;
 
     // Update coin counter
     coinText.setText(`Coins: ${player.customData.coins}`);
