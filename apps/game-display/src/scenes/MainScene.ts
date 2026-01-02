@@ -34,6 +34,19 @@ export class MainScene extends Phaser.Scene {
     super({ key: 'MainScene' });
   }
 
+  preload() {
+    this.load.spritesheet('character',
+      '/assets/sprout-land/Characters/Basic Charakter Spritesheet.png', {
+      frameWidth: 48,
+      frameHeight: 48
+    });
+
+    // Set pixel-perfect filter after load
+    this.load.on('complete', () => {
+      this.textures.get('character').setFilter(Phaser.Textures.FilterMode.NEAREST);
+    });
+  }
+
   create() {
     // Create particle texture
     const graphics = this.add.graphics();
