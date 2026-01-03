@@ -6,6 +6,7 @@ interface PlayerState {
   size: number;
   speed: number;
   color: string;
+  currentMapId?: string;
 }
 
 interface MovementControllerCallbacks {
@@ -17,7 +18,7 @@ interface MovementControllerCallbacks {
 
 export class MovementController extends BaseController {
   private callbacks: MovementControllerCallbacks;
-  private playerState: PlayerState = { coins: 0, size: 1, speed: 1, color: '#ffffff' };
+  private playerState: PlayerState = { coins: 0, size: 1, speed: 1, color: '#ffffff', currentMapId: 'main' };
 
   constructor(serverUrl: string, roomCode: string, callbacks: MovementControllerCallbacks) {
     super(serverUrl, roomCode);
@@ -40,7 +41,8 @@ export class MovementController extends BaseController {
         coins: playerData.customData.coins || 0,
         size: playerData.customData.size || 1,
         speed: playerData.customData.speed || 1,
-        color: playerData.color
+        color: playerData.color,
+        currentMapId: playerData.customData.currentMapId
       };
 
       if (this.callbacks.onStateUpdate) {

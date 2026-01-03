@@ -15,6 +15,7 @@ interface MovementPlayerData {
     coins: number;
     size: number;
     speed: number;
+    currentMapId: string;
   };
 }
 
@@ -526,8 +527,13 @@ export class MainScene extends Phaser.Scene {
   private handleStateUpdate(state: GameState): void {
     const players = state.players as Record<string, MovementPlayerData>;
 
-    // Update existing players and create new ones
-    Object.values(players).forEach(player => {
+    // Only show players on main map
+    const mainMapPlayers = Object.values(players).filter(
+      p => !p.customData.currentMapId || p.customData.currentMapId === 'main'
+    );
+
+    // Update existing and create new
+    mainMapPlayers.forEach(player => {
       if (!this.playerSprites.has(player.id)) {
         this.createPlayerSprite(player);
       } else {
@@ -535,9 +541,10 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
-    // Remove players that are no longer in the state
+    // Remove players who left main map or disconnected
     this.playerSprites.forEach((playerData, playerId) => {
-      if (!players[playerId]) {
+      const stillOnMain = mainMapPlayers.find(p => p.id === playerId);
+      if (!stillOnMain) {
         playerData.container.destroy();
         this.playerSprites.delete(playerId);
       }

@@ -12,6 +12,7 @@ export default function ControllerPage() {
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [displayUrl, setDisplayUrl] = useState<string>('');
 
   useEffect(() => {
     if (!roomCode) return;
@@ -22,6 +23,7 @@ export default function ControllerPage() {
       controllerUrl: import.meta.env.VITE_GAME_CONTROLLER_URL
     });
     const serverUrl = urlBuilder.getServerUrl();
+    setDisplayUrl(urlBuilder.getDisplayUrl());
     const ctrl = new MovementController(serverUrl, roomCode, {
       onJoined: (id) => {
         setPlayerId(id);
@@ -75,7 +77,7 @@ export default function ControllerPage() {
 
   return (
     <div className="controller-page">
-      <GameController controller={controller!} playerName={playerName} />
+      <GameController controller={controller!} playerName={playerName} roomCode={roomCode!} displayUrl={displayUrl} />
     </div>
   );
 }

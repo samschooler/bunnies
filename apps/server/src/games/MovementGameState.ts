@@ -14,6 +14,15 @@ interface Coin {
   y: number;
 }
 
+interface Portal {
+  id: string;
+  x: number;          // World X position (scaled)
+  y: number;          // World Y position (scaled)
+  width: number;      // Portal rectangle width (scaled)
+  height: number;     // Portal rectangle height (scaled)
+  worldName: string;  // e.g., "PLAYER_HOUSE"
+}
+
 export class MovementGameState extends BaseGameState {
   private worldWidth = 1920;
   private worldHeight = 1080;
@@ -24,10 +33,14 @@ export class MovementGameState extends BaseGameState {
   private nextCoinId = 0;
   private collisionRects: CollisionRect[] = [];
   private spawnZones: CollisionRect[] = [];
+  private portals: Portal[] = [];
+  private interiorPortals: Portal[] = [];
+  private interiorCollisionRects: CollisionRect[] = [];
 
   constructor() {
     super();
     this.loadMapData();
+    this.loadInteriorMapData();
   }
 
   private loadMapData(): void {
@@ -53,10 +66,93 @@ export class MovementGameState extends BaseGameState {
 
       console.log(`Loaded ${this.collisionRects.length} collision rectangles from StaticObjects layer`);
       console.log(`Loaded ${this.spawnZones.length} spawn zones from SpawnZone layer`);
+
+      // Parse Portal layer (object layer with go_to_world properties)
+      const portalLayer = tilemapData.layers.find(
+        l => l.name === 'Portal' && l.type === 'objectgroup'
+      );
+
+      if (portalLayer?.objects) {
+        portalLayer.objects.forEach((obj: any) => {
+          // Extract go_to_world property
+          let worldName = '';
+          if (obj.properties) {
+            const goToWorldProp = obj.properties.find((p: any) => p.name === 'go_to_world');
+            if (goToWorldProp) {
+              worldName = goToWorldProp.value;
+            }
+          }
+
+          if (worldName) {
+            this.portals.push({
+              id: `portal-${obj.id}`,
+              x: obj.x * 4,           // Scale to world coordinates
+              y: obj.y * 4,
+              width: obj.width * 4,
+              height: obj.height * 4,
+              worldName: worldName
+            });
+          }
+        });
+      }
+
+      console.log(`Loaded ${this.portals.length} portals`);
     } catch (error) {
       console.error('Failed to load tilemap data:', error);
       this.collisionRects = [];
       this.spawnZones = [];
+    }
+  }
+
+  private loadInteriorMapData(): void {
+    try {
+      // Use env var for assets path to avoid fragile relative paths
+      const assetsBasePath = process.env.ASSETS_PATH || join(__dirname, '../../../game-display/public/assets');
+      const tilemapPath = join(assetsBasePath, 'sprout-land/tilemaps/house-interior.json');
+      const tilemapJson = readFileSync(tilemapPath, 'utf-8');
+      const tilemapData: TilemapData = JSON.parse(tilemapJson);
+
+      // Parse collision
+      this.interiorCollisionRects = MapCollisionParser.parseObjectLayer(
+        tilemapData,
+        'StaticObjects',
+        4
+      );
+
+      // Parse return portal
+      const portalLayer = tilemapData.layers.find(
+        l => l.name === 'Portal' && l.type === 'objectgroup'
+      );
+
+      if (portalLayer?.objects) {
+        portalLayer.objects.forEach((obj: any) => {
+          let worldName = '';
+          if (obj.properties) {
+            const goToWorldProp = obj.properties.find((p: any) => p.name === 'go_to_world');
+            if (goToWorldProp) {
+              worldName = goToWorldProp.value;
+            }
+          }
+
+          if (worldName === 'MAIN') {
+            this.interiorPortals.push({
+              id: `interior-portal-${obj.id}`,
+              x: obj.x * 4,
+              y: obj.y * 4,
+              width: obj.width * 4,
+              height: obj.height * 4,
+              worldName: worldName
+            });
+          }
+        });
+      }
+
+      console.log(`Loaded ${this.interiorCollisionRects.length} interior collision rects`);
+      console.log(`Loaded ${this.interiorPortals.length} interior return portals`);
+    } catch (error) {
+      console.error('Failed to load interior map:', error);
+      this.interiorCollisionRects = [];
+      this.interiorPortals = [];
     }
   }
 
@@ -86,17 +182,98 @@ export class MovementGameState extends BaseGameState {
     return {
       worldWidth: this.worldWidth,
       worldHeight: this.worldHeight,
-      coins: this.coins
+      coins: this.coins,
+      portals: this.portals.map(p => ({
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height
+      }))
     };
   }
 
+  private isPositionValid(x: number, y: number, radius: number): boolean {
+    // Check if position overlaps with any collision rectangles
+    for (const rect of this.collisionRects) {
+      // Expand rectangle by coin radius for proper collision checking
+      const expandedRect = {
+        x: rect.x - radius,
+        y: rect.y - radius,
+        width: rect.width + radius * 2,
+        height: rect.height + radius * 2
+      };
+
+      // Check if point is inside expanded rectangle
+      if (x >= expandedRect.x && x <= expandedRect.x + expandedRect.width &&
+          y >= expandedRect.y && y <= expandedRect.y + expandedRect.height) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private spawnCoin(): void {
-    const coin: Coin = {
-      id: `coin-${this.nextCoinId++}`,
-      x: Math.random() * (this.worldWidth - 100) + 50,
-      y: Math.random() * (this.worldHeight - 100) + 50
-    };
-    this.coins.push(coin);
+    let x: number;
+    let y: number;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    // Keep trying until we find a valid position
+    do {
+      x = Math.random() * (this.worldWidth - 100) + 50;
+      y = Math.random() * (this.worldHeight - 100) + 50;
+      attempts++;
+    } while (!this.isPositionValid(x, y, this.coinRadius) && attempts < maxAttempts);
+
+    // Only spawn if we found a valid position
+    if (attempts < maxAttempts) {
+      const coin: Coin = {
+        id: `coin-${this.nextCoinId++}`,
+        x,
+        y
+      };
+      this.coins.push(coin);
+    }
+  }
+
+  private updatePlayerCollisionContext(player: MovementPlayer): void {
+    if (player.currentMapId === 'main') {
+      player.setCollisionRects(this.collisionRects);
+    } else {
+      player.setCollisionRects(this.interiorCollisionRects);
+    }
+  }
+
+  private enterPortal(player: MovementPlayer, portal: Portal): void {
+    const now = Date.now();
+    if (now - player.lastPortalTransition < player.portalCooldownMs) {
+      return; // Cooldown active
+    }
+    player.lastPortalTransition = now;
+
+    if (player.currentMapId === 'main') {
+      // Transform PLAYER_HOUSE -> interior-${playerId} for isolation
+      const targetWorld = portal.worldName.replace('PLAYER_HOUSE', `interior-${player.id}`);
+      player.currentMapId = targetWorld;
+      player.x = 480;  // Center of interior map (960px / 2)
+      player.y = 520;  // Near bottom of interior
+
+      // Store return portal location (center of portal rectangle)
+      player.returnX = portal.x + portal.width / 2;
+      player.returnY = portal.y + portal.height + 20; // Below portal
+
+      // Update collision context to interior
+      this.updatePlayerCollisionContext(player);
+    } else {
+      // Exit to main (return from interior)
+      player.currentMapId = 'main';
+      player.x = player.returnX || 480;
+      player.y = player.returnY || 540;
+
+      // Update collision context to main
+      this.updatePlayerCollisionContext(player);
+    }
   }
 
   update(deltaTime: number): void {
@@ -116,6 +293,16 @@ export class MovementGameState extends BaseGameState {
 
       // Check coin collisions
       this.checkCoinCollisions(movementPlayer);
+
+      // Check portal collisions
+      const portal = movementPlayer.checkPortalCollision(this.portals, this.interiorPortals);
+
+      if (portal && !movementPlayer.isInPortalZone) {
+        movementPlayer.isInPortalZone = true;
+        this.enterPortal(movementPlayer, portal);
+      } else if (!portal && movementPlayer.isInPortalZone) {
+        movementPlayer.isInPortalZone = false;
+      }
     });
   }
 

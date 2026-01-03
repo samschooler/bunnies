@@ -6,6 +6,8 @@ import './GameController.css';
 interface GameControllerProps {
   controller: MovementController;
   playerName: string;
+  roomCode: string;
+  displayUrl: string;
 }
 
 interface PlayerState {
@@ -13,11 +15,13 @@ interface PlayerState {
   size: number;
   speed: number;
   color: string;
+  currentMapId?: string;
 }
 
-export default function GameController({ controller, playerName }: GameControllerProps) {
+export default function GameController({ controller, playerName, roomCode, displayUrl }: GameControllerProps) {
   const [activeDirections, setActiveDirections] = useState<Set<string>>(new Set());
   const [playerState, setPlayerState] = useState<PlayerState>({ coins: 0, size: 1, speed: 1, color: '#ffffff' });
+  const [currentMapId, setCurrentMapId] = useState<string>('main');
   const [showStore, setShowStore] = useState(false);
   const inputIntervalRef = useRef<number | null>(null);
   const currentInputRef = useRef({ dx: 0, dy: 0 });
@@ -31,6 +35,7 @@ export default function GameController({ controller, playerName }: GameControlle
     // Setup state update callback
     (controller as any).callbacks.onStateUpdate = (state: PlayerState) => {
       setPlayerState(state);
+      setCurrentMapId(state.currentMapId || 'main');
     };
 
     return () => {
@@ -204,6 +209,16 @@ export default function GameController({ controller, playerName }: GameControlle
               Close
             </button>
           </div>
+        </div>
+      )}
+
+      {currentMapId !== 'main' && (
+        <div className="interior-display">
+          <iframe
+            src={`${displayUrl}/interior.html?roomCode=${roomCode}`}
+            className="mini-display-frame"
+            title="House Interior"
+          />
         </div>
       )}
 

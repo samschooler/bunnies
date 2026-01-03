@@ -2,6 +2,15 @@ import { BasePlayer } from '@party-game/game-framework/server';
 import { PlayerData, STORE_CONFIG, calculateUpgradeCost, CollisionRect } from '@party-game/shared-types';
 import { ColorGenerator } from '@party-game/game-framework';
 
+interface Portal {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  worldName: string;
+}
+
 interface MovementPlayerData extends PlayerData {
   customData: {
     x: number;
@@ -11,6 +20,7 @@ interface MovementPlayerData extends PlayerData {
     coins: number;
     size: number;
     speed: number;
+    currentMapId: string;
   };
 }
 
@@ -23,6 +33,12 @@ export class MovementPlayer extends BasePlayer {
   public size: number = 1.0; // size multiplier
   public speedUpgrade: number = 1.0; // speed multiplier
   public ownedColors: Set<string> = new Set();
+  public currentMapId: string = 'main';
+  public isInPortalZone: boolean = false;
+  public lastPortalTransition: number = 0;
+  public portalCooldownMs: number = 500;
+  public returnX: number = 0;
+  public returnY: number = 0;
   private baseSpeed: number = 200; // movement speed (pixels per second)
   private readonly collisionWidth: number = 50; // Player collision box width
   private readonly collisionHeight: number = 28.8; // Player collision box height (half of original 57.6)
@@ -58,7 +74,8 @@ export class MovementPlayer extends BasePlayer {
         vy: this.vy,
         coins: this.coins,
         size: this.size,
-        speed: this.speedUpgrade
+        speed: this.speedUpgrade,
+        currentMapId: this.currentMapId
       }
     };
   }
@@ -140,6 +157,38 @@ export class MovementPlayer extends BasePlayer {
     }
 
     return false; // No collision
+  }
+
+  public checkPortalCollision(mainPortals: Portal[], interiorPortals: Portal[]): Portal | null {
+    let portalsToCheck: Portal[] = [];
+
+    if (this.currentMapId === 'main') {
+      portalsToCheck = mainPortals;
+    } else {
+      portalsToCheck = interiorPortals;
+    }
+
+    // AABB collision
+    const playerLeft = this.x - this.collisionWidth / 2;
+    const playerRight = this.x + this.collisionWidth / 2;
+    const playerTop = this.y - this.collisionHeight / 2 + this.collisionTopMargin;
+    const playerBottom = this.y + this.collisionHeight / 2 + this.collisionTopMargin;
+
+    for (const portal of portalsToCheck) {
+      const portalLeft = portal.x;
+      const portalRight = portal.x + portal.width;
+      const portalTop = portal.y;
+      const portalBottom = portal.y + portal.height;
+
+      if (playerRight > portalLeft &&
+          playerLeft < portalRight &&
+          playerBottom > portalTop &&
+          playerTop < portalBottom) {
+        return portal;
+      }
+    }
+
+    return null;
   }
 
   update(deltaTime: number): void {

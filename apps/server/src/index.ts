@@ -63,6 +63,11 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../../game-display/dist/index.landing.html'));
   });
 
+  // Handle interior display route
+  app.get('/interior.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../game-display/dist/interior.html'));
+  });
+
   app.get('/:roomCode', (req, res) => {
     // Only match 4-character alphanumeric room codes
     const roomCode = req.params.roomCode;

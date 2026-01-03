@@ -4,8 +4,8 @@ import QRCode from 'qrcode';
 
 export class MovementGameDisplay extends BaseGameDisplay {
   private game: Phaser.Game;
-  private playerListElement: HTMLElement;
-  private playerCountElement: HTMLElement;
+  private playerListElement: HTMLElement | null;
+  private playerCountElement: HTMLElement | null;
   private urlBuilder: URLBuilder;
   private currentRoomCode: string | null = null;
 
@@ -13,8 +13,8 @@ export class MovementGameDisplay extends BaseGameDisplay {
     super(serverUrl);
     this.urlBuilder = urlBuilder;
     this.game = game;
-    this.playerListElement = document.getElementById('players')!;
-    this.playerCountElement = document.getElementById('player-count')!;
+    this.playerListElement = document.getElementById('players');
+    this.playerCountElement = document.getElementById('player-count');
   }
 
   onRoomCreated(roomCode: string): void {
@@ -24,11 +24,12 @@ export class MovementGameDisplay extends BaseGameDisplay {
   }
 
   onStateUpdate(state: GameState): void {
-    // Send state to Phaser scene
-    const scene = this.game.scene.getScene('MainScene');
-    if (scene) {
+    // Send state to all active Phaser scenes
+    const scenes = this.game.scene.getScenes(true); // Get all active scenes
+    scenes.forEach(scene => {
       scene.events.emit('state-update', state);
-    }
+    });
+
     this.updatePlayerList(state.players);
   }
 
@@ -41,9 +42,14 @@ export class MovementGameDisplay extends BaseGameDisplay {
   }
 
   private async displayQRCode(roomCode: string): Promise<void> {
-    const qrContainer = document.getElementById('qr-container')!;
+    const qrContainer = document.getElementById('qr-container');
     const qrCanvas = document.getElementById('qr-code') as HTMLCanvasElement;
-    const roomCodeElement = document.getElementById('room-code')!;
+    const roomCodeElement = document.getElementById('room-code');
+
+    // Skip if elements don't exist (e.g., in interior.html)
+    if (!qrContainer || !qrCanvas || !roomCodeElement) {
+      return;
+    }
 
     // Get controller URL from URLBuilder
     const url = this.urlBuilder.getControllerUrl(roomCode);
@@ -66,6 +72,11 @@ export class MovementGameDisplay extends BaseGameDisplay {
   }
 
   private updatePlayerList(players: Record<string, PlayerData>): void {
+    // Skip if elements don't exist (e.g., in interior.html)
+    if (!this.playerListElement || !this.playerCountElement) {
+      return;
+    }
+
     const playerArray = Object.values(players);
     this.playerCountElement.textContent = playerArray.length.toString();
 
