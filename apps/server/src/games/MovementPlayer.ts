@@ -1,5 +1,5 @@
 import { BasePlayer } from '@party-game/game-framework/server';
-import { PlayerData, STORE_CONFIG, calculateUpgradeCost } from '@party-game/shared-types';
+import { PlayerData, STORE_CONFIG, calculateUpgradeCost, CollisionRect } from '@party-game/shared-types';
 import { ColorGenerator } from '@party-game/game-framework';
 
 interface MovementPlayerData extends PlayerData {
@@ -23,9 +23,11 @@ export class MovementPlayer extends BasePlayer {
   public size: number = 1.0; // size multiplier
   public speedUpgrade: number = 1.0; // speed multiplier
   public ownedColors: Set<string> = new Set();
-  private baseAcceleration: number = 800; // pixels per second squared
-  private baseMaxSpeed: number = 250; // max pixels per second
-  private friction: number = 0.85; // friction coefficient
+  private baseSpeed: number = 200; // movement speed (pixels per second)
+  private readonly collisionWidth: number = 50; // Player collision box width
+  private readonly collisionHeight: number = 28.8; // Player collision box height (half of original 57.6)
+  private readonly collisionTopMargin: number = 28.8; // Top margin for hitbox (equal to new height)
+  private collisionRects: CollisionRect[] = [];
 
   constructor(id: string, name: string, x: number, y: number) {
     const color = ColorGenerator.getColor();
@@ -34,12 +36,12 @@ export class MovementPlayer extends BasePlayer {
     this.y = y;
   }
 
-  get acceleration(): number {
-    return this.baseAcceleration * this.speedUpgrade;
+  get speed(): number {
+    return this.baseSpeed * this.speedUpgrade;
   }
 
-  get maxSpeed(): number {
-    return this.baseMaxSpeed * this.speedUpgrade;
+  setCollisionRects(rects: CollisionRect[]): void {
+    this.collisionRects = rects;
   }
 
   getState(): MovementPlayerData {
@@ -114,39 +116,79 @@ export class MovementPlayer extends BasePlayer {
   private inputDx: number = 0;
   private inputDy: number = 0;
 
+  private checkCollision(x: number, y: number): boolean {
+    // Player collision box is centered horizontally, shifted down by top margin
+    const playerLeft = x - this.collisionWidth / 2;
+    const playerRight = x + this.collisionWidth / 2;
+    const playerTop = y - this.collisionHeight / 2 + this.collisionTopMargin;
+    const playerBottom = y + this.collisionHeight / 2 + this.collisionTopMargin;
+
+    // Check against all collision rectangles from tilemap
+    for (const rect of this.collisionRects) {
+      const rectLeft = rect.x;
+      const rectRight = rect.x + rect.width;
+      const rectTop = rect.y;
+      const rectBottom = rect.y + rect.height;
+
+      // AABB collision detection
+      if (playerRight > rectLeft &&
+        playerLeft < rectRight &&
+        playerBottom > rectTop &&
+        playerTop < rectBottom) {
+        return true; // Collision detected
+      }
+    }
+
+    return false; // No collision
+  }
+
   update(deltaTime: number): void {
     // Convert deltaTime from ms to seconds
     const dt = deltaTime / 1000;
 
-    // Apply acceleration based on input
+    // Set velocity directly based on input (no acceleration/friction)
     if (this.inputDx !== 0 || this.inputDy !== 0) {
       // Normalize diagonal movement
       const magnitude = Math.sqrt(this.inputDx * this.inputDx + this.inputDy * this.inputDy);
       const normalizedDx = this.inputDx / magnitude;
       const normalizedDy = this.inputDy / magnitude;
 
-      this.vx += normalizedDx * this.acceleration * dt;
-      this.vy += normalizedDy * this.acceleration * dt;
+      // Set velocity to constant speed in input direction
+      this.vx = normalizedDx * this.speed;
+      this.vy = normalizedDy * this.speed;
+    } else {
+      // No input = stop immediately
+      this.vx = 0;
+      this.vy = 0;
     }
 
-    // Apply friction
-    this.vx *= this.friction;
-    this.vy *= this.friction;
+    // Calculate new position
+    const newX = this.x + this.vx * dt;
+    const newY = this.y + this.vy * dt;
 
-    // Clamp velocity to max speed
-    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-    if (speed > this.maxSpeed) {
-      this.vx = (this.vx / speed) * this.maxSpeed;
-      this.vy = (this.vy / speed) * this.maxSpeed;
+    // Check collision for full movement
+    if (!this.checkCollision(newX, newY)) {
+      // No collision, move freely
+      this.x = newX;
+      this.y = newY;
+    } else {
+      // Collision detected, try sliding along walls
+      // Try X movement only
+      if (!this.checkCollision(newX, this.y)) {
+        this.x = newX;
+        this.vy = 0; // Stop Y velocity when hitting horizontal wall
+      }
+      // Try Y movement only
+      else if (!this.checkCollision(this.x, newY)) {
+        this.y = newY;
+        this.vx = 0; // Stop X velocity when hitting vertical wall
+      }
+      // Can't move in either direction, stop completely
+      else {
+        this.vx = 0;
+        this.vy = 0;
+      }
     }
-
-    // Stop completely if velocity is very small
-    if (Math.abs(this.vx) < 0.1) this.vx = 0;
-    if (Math.abs(this.vy) < 0.1) this.vy = 0;
-
-    // Update position based on velocity
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
   }
 
   disconnect(): void {
