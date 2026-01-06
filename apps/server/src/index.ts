@@ -5,14 +5,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from monorepo root
 config({ path: path.resolve(__dirname, '../../../.env') });
 
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { MovementGameServer } from './games/MovementGameServer.js';
+import { initializeGames, registry } from '@party-game/shared-types';
 import { getLocalIpAddress } from './utils/network.js';
 
 const app = express();
@@ -28,62 +27,125 @@ const io = new Server(httpServer, {
 const PORT = process.env.PORT || 3000;
 const localIp = getLocalIpAddress();
 
-// Initialize game server
-const gameServer = new MovementGameServer(io, localIp);
+// Store active game servers per room
+const activeServers: Map<string, any> = new Map();
 
-app.use(cors());
-app.use(express.json());
+async function main() {
+  // Initialize all games
+  await initializeGames();
 
-// API endpoint to create a room
-app.post('/api/room/create', async (req, res) => {
-  try {
-    const roomCode = await gameServer.createRoomViaAPI();
-    res.json({ roomCode });
-  } catch (error: any) {
-    console.error('Failed to create room:', error);
-    res.status(500).json({ error: error.message || 'Failed to create room' });
+  const games = registry.getAllGames();
+  console.log(`Loaded ${games.length} games: ${games.map(g => g.id).join(', ')}`);
+
+  // Set up namespace for each game
+  for (const game of games) {
+    const namespace = io.of(`/${game.id}`);
+
+    namespace.on('connection', (socket) => {
+      console.log(`[${game.id}] Socket connected: ${socket.id}`);
+
+      socket.on('room:create', () => {
+        const roomCode = registry.generateRoomCode(game.id);
+        if (!roomCode) {
+          socket.emit('room:error', { code: 'INVALID_GAME', message: 'Invalid game' });
+          return;
+        }
+
+        const server = game.createServer(namespace as any, roomCode);
+        activeServers.set(roomCode, server);
+
+        // Manually trigger room creation on the server
+        server.io = namespace;
+        const room = server.roomManager.createRoom(socket.id);
+        const gameState = server.createGameState(room.roomId);
+        server.gameStates.set(room.roomId, gameState);
+
+        socket.join(room.roomId);
+        socket.emit('room:created', {
+          roomCode: roomCode,
+          roomId: room.roomId,
+          serverIp: localIp
+        });
+
+        console.log(`[${game.id}] Room created: ${roomCode}`);
+      });
+
+      // Other events handled by game server
+    });
   }
-});
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  // Serve controller app static files
-  app.use('/controller', express.static(path.join(__dirname, '../../controller/dist')));
+  app.use(cors());
+  app.use(express.json());
 
-  // Serve display app static assets (but not at root, we'll handle routing separately)
-  app.use('/assets', express.static(path.join(__dirname, '../../game-display/dist/assets')));
+  // API endpoint to create a room for a specific game
+  app.post('/api/room/create', async (req, res) => {
+    const { gameId } = req.body;
+    const game = registry.getGame(gameId);
 
-  // Handle controller routes - serve controller HTML for /controller/:roomCode
-  app.get('/controller/:roomCode', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../controller/dist/index.html'));
-  });
-
-  // Handle display routes - serve landing page at root
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../game-display/dist/index.landing.html'));
-  });
-
-  // Handle interior display route
-  app.get('/interior.html', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../game-display/dist/interior.html'));
-  });
-
-  app.get('/:roomCode', (req, res) => {
-    // Only match 4-character alphanumeric room codes
-    const roomCode = req.params.roomCode;
-    if (/^[A-Z0-9]{4}$/i.test(roomCode)) {
-      res.sendFile(path.join(__dirname, '../../game-display/dist/index.html'));
-    } else {
-      res.status(404).send('Not found');
+    if (!game) {
+      res.status(400).json({ error: 'Invalid game ID' });
+      return;
     }
+
+    const roomCode = registry.generateRoomCode(gameId);
+    res.json({ roomCode, gameId });
+  });
+
+  // API to get all available games
+  app.get('/api/games', (req, res) => {
+    const games = registry.getAllGames().map(g => ({
+      id: g.id,
+      name: g.name,
+      maxPlayers: g.maxPlayers
+    }));
+    res.json({ games });
+  });
+
+  // API to parse a room code
+  app.get('/api/room/:code', (req, res) => {
+    const parsed = registry.parseRoomCode(req.params.code);
+    if (!parsed) {
+      res.status(404).json({ error: 'Invalid room code' });
+      return;
+    }
+    res.json(parsed);
+  });
+
+  // Serve static files in production
+  if (process.env.NODE_ENV === 'production') {
+    // Serve game assets
+    app.use('/games', express.static(path.join(__dirname, '../../../games')));
+
+    // Serve controller app
+    app.use('/controller', express.static(path.join(__dirname, '../../controller/dist')));
+
+    // Serve display app assets
+    app.use('/assets', express.static(path.join(__dirname, '../../game-display/dist/assets')));
+
+    // Handle routes
+    app.get('/', (req, res) => {
+      res.sendFile(path.join(__dirname, '../../game-display/dist/index.html'));
+    });
+
+    app.get('/room/:roomCode', (req, res) => {
+      res.sendFile(path.join(__dirname, '../../game-display/dist/index.html'));
+    });
+
+    app.get('/:gameId', (req, res) => {
+      const game = registry.getGame(req.params.gameId);
+      if (game) {
+        res.sendFile(path.join(__dirname, '../../game-display/dist/index.html'));
+      } else {
+        res.status(404).send('Game not found');
+      }
+    });
+  }
+
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on:`);
+    console.log(`  Local:   http://localhost:${PORT}`);
+    console.log(`  Network: http://${localIp}:${PORT}`);
   });
 }
 
-httpServer.listen(PORT, () => {
-  console.log(`Server running on:`);
-  console.log(`  Local:   http://localhost:${PORT}`);
-  console.log(`  Network: http://${localIp}:${PORT}`);
-  console.log(`\nDisplay: Create new room at http://${localIp}:${PORT}/`);
-  console.log(`Display: Join existing room at http://${localIp}:${PORT}/:roomCode`);
-  console.log(`Controller: http://${localIp}:${PORT}/controller/:roomCode`);
-});
+main().catch(console.error);
