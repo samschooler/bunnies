@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { URLBuilder } from '@party-game/shared-types';
-import { InteriorScene } from './scenes/InteriorScene';
+import { FieldScene } from './scenes/FieldScene';
 import { MovementGameDisplay } from './game/MovementGameDisplay';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 576,
+  width: 768,
   height: 640,
   backgroundColor: '#1a1a2e',
   parent: document.body,
@@ -20,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
-  scene: [InteriorScene]
+  scene: [FieldScene]
 };
 
 const game = new Phaser.Game(config);
@@ -44,7 +44,7 @@ if (roomCode) {
   const gameDisplay = new MovementGameDisplay(serverUrl, game, urlBuilder);
 
   // Join room with the code from URL
-  console.log(`Interior display joining room: ${roomCode}`);
+  console.log(`Field display joining room: ${roomCode}`);
   gameDisplay.joinRoom(roomCode);
 
   // Make it available globally for debugging

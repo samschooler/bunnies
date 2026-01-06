@@ -29,9 +29,9 @@ export default function ControllerPage() {
         setPlayerId(id);
         setError(null);
       },
-      onSessionRestored: (id) => {
+      onSessionRestored: (id, name) => {
         setPlayerId(id);
-        setPlayerName('Restored');
+        setPlayerName(name);
         setError(null);
       },
       onError: (err) => {

@@ -1,6 +1,6 @@
 import { BaseGameState, BasePlayer } from '@party-game/game-framework/server';
 import { MovementPlayer } from './MovementPlayer.js';
-import { MapCollisionParser, CollisionRect, TilemapData } from '@party-game/shared-types';
+import { MapCollisionParser, CollisionRect, TilemapData, STORE_CONFIG, PlacedObject } from '@party-game/shared-types';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -36,11 +36,16 @@ export class MovementGameState extends BaseGameState {
   private portals: Portal[] = [];
   private interiorPortals: Portal[] = [];
   private interiorCollisionRects: CollisionRect[] = [];
+  private fieldPortals: Portal[] = [];
+  private fieldCollisionRects: CollisionRect[] = [];
+  private placedObjects: PlacedObject[] = [];
+  private nextObjectId = 0;
 
   constructor() {
     super();
     this.loadMapData();
     this.loadInteriorMapData();
+    this.loadFieldMapData();
   }
 
   private loadMapData(): void {
@@ -156,6 +161,58 @@ export class MovementGameState extends BaseGameState {
     }
   }
 
+  private loadFieldMapData(): void {
+    try {
+      // Use env var for assets path to avoid fragile relative paths
+      const assetsBasePath = process.env.ASSETS_PATH || join(__dirname, '../../../game-display/public/assets');
+      const tilemapPath = join(assetsBasePath, 'sprout-land/tilemaps/field-interior.json');
+      const tilemapJson = readFileSync(tilemapPath, 'utf-8');
+      const tilemapData: TilemapData = JSON.parse(tilemapJson);
+
+      // Parse collision
+      this.fieldCollisionRects = MapCollisionParser.parseObjectLayer(
+        tilemapData,
+        'StaticObjects',
+        4
+      );
+
+      // Parse return portal
+      const portalLayer = tilemapData.layers.find(
+        l => l.name === 'Portal' && l.type === 'objectgroup'
+      );
+
+      if (portalLayer?.objects) {
+        portalLayer.objects.forEach((obj: any) => {
+          let worldName = '';
+          if (obj.properties) {
+            const goToWorldProp = obj.properties.find((p: any) => p.name === 'go_to_world');
+            if (goToWorldProp) {
+              worldName = goToWorldProp.value;
+            }
+          }
+
+          if (worldName === 'MAIN') {
+            this.fieldPortals.push({
+              id: `field-portal-${obj.id}`,
+              x: obj.x * 4,
+              y: obj.y * 4,
+              width: obj.width * 4,
+              height: obj.height * 4,
+              worldName: worldName
+            });
+          }
+        });
+      }
+
+      console.log(`Loaded ${this.fieldCollisionRects.length} field collision rects`);
+      console.log(`Loaded ${this.fieldPortals.length} field return portals`);
+    } catch (error) {
+      console.error('Failed to load field map:', error);
+      this.fieldCollisionRects = [];
+      this.fieldPortals = [];
+    }
+  }
+
   createPlayer(id: string, name: string): BasePlayer {
     let x: number;
     let y: number;
@@ -189,7 +246,8 @@ export class MovementGameState extends BaseGameState {
         y: p.y,
         width: p.width,
         height: p.height
-      }))
+      })),
+      placedObjects: this.placedObjects
     };
   }
 
@@ -240,8 +298,13 @@ export class MovementGameState extends BaseGameState {
   private updatePlayerCollisionContext(player: MovementPlayer): void {
     if (player.currentMapId === 'main') {
       player.setCollisionRects(this.collisionRects);
-    } else {
+    } else if (player.currentMapId.startsWith('interior-')) {
       player.setCollisionRects(this.interiorCollisionRects);
+    } else if (player.currentMapId.startsWith('field-')) {
+      player.setCollisionRects(this.fieldCollisionRects);
+    } else {
+      // Default fallback
+      player.setCollisionRects(this.collisionRects);
     }
   }
 
@@ -253,20 +316,34 @@ export class MovementGameState extends BaseGameState {
     player.lastPortalTransition = now;
 
     if (player.currentMapId === 'main') {
-      // Transform PLAYER_HOUSE -> interior-${playerId} for isolation
-      const targetWorld = portal.worldName.replace('PLAYER_HOUSE', `interior-${player.id}`);
+      // Transform PLAYER_HOUSE -> interior-${playerId} or PLAYER_FIELD -> field-${playerId} for isolation
+      let targetWorld = portal.worldName;
+      targetWorld = targetWorld.replace('PLAYER_HOUSE', `interior-${player.id}`);
+      targetWorld = targetWorld.replace('PLAYER_FIELD', `field-${player.id}`);
+
       player.currentMapId = targetWorld;
-      player.x = 480;  // Center of interior map (960px / 2)
-      player.y = 520;  // Near bottom of interior
+
+      // Set spawn position based on target world
+      if (targetWorld.startsWith('interior-')) {
+        player.x = 480;  // Center of interior map (960px / 2)
+        player.y = 520;  // Near bottom of interior
+      } else if (targetWorld.startsWith('field-')) {
+        player.x = 384;  // Center of field map (768px / 2)
+        player.y = 2240; // Near bottom of field (spawn zone)
+      } else {
+        // Default fallback
+        player.x = 480;
+        player.y = 520;
+      }
 
       // Store return portal location (center of portal rectangle)
       player.returnX = portal.x + portal.width / 2;
       player.returnY = portal.y + portal.height + 20; // Below portal
 
-      // Update collision context to interior
+      // Update collision context to interior/field
       this.updatePlayerCollisionContext(player);
     } else {
-      // Exit to main (return from interior)
+      // Exit to main (return from interior/field)
       player.currentMapId = 'main';
       player.x = player.returnX || 480;
       player.y = player.returnY || 540;
@@ -286,16 +363,27 @@ export class MovementGameState extends BaseGameState {
     this.players.forEach(player => {
       player.update(deltaTime);
 
-      // Keep players in bounds
+      // Keep players in bounds (map-specific)
       const movementPlayer = player as MovementPlayer;
-      movementPlayer.x = Math.max(0, Math.min(this.worldWidth, movementPlayer.x));
-      movementPlayer.y = Math.max(0, Math.min(this.worldHeight, movementPlayer.y));
+      let maxX = this.worldWidth;
+      let maxY = this.worldHeight;
+
+      if (movementPlayer.currentMapId.startsWith('interior-')) {
+        maxX = 576;  // 9 tiles * 16 * 4
+        maxY = 640;  // 10 tiles * 16 * 4
+      } else if (movementPlayer.currentMapId.startsWith('field-')) {
+        maxX = 768;  // 12 tiles * 16 * 4
+        maxY = 2560; // 40 tiles * 16 * 4
+      }
+
+      movementPlayer.x = Math.max(0, Math.min(maxX, movementPlayer.x));
+      movementPlayer.y = Math.max(0, Math.min(maxY, movementPlayer.y));
 
       // Check coin collisions
       this.checkCoinCollisions(movementPlayer);
 
       // Check portal collisions
-      const portal = movementPlayer.checkPortalCollision(this.portals, this.interiorPortals);
+      const portal = movementPlayer.checkPortalCollision(this.portals, this.interiorPortals, this.fieldPortals);
 
       if (portal && !movementPlayer.isInPortalZone) {
         movementPlayer.isInPortalZone = true;
@@ -321,5 +409,52 @@ export class MovementGameState extends BaseGameState {
         this.coins.splice(i, 1);
       }
     }
+  }
+
+  public placeObject(
+    playerId: string,
+    itemId: string,
+    x: number,
+    y: number,
+    mapId: string
+  ): PlacedObject | null {
+    // 1. Find item in STORE_CONFIG.placeableItems
+    const item = STORE_CONFIG.placeableItems.find(i => i.id === itemId);
+    if (!item) {
+      console.error(`Invalid item ID: ${itemId}`);
+      return null;
+    }
+
+    // 2. Get player and validate coins
+    const player = this.getPlayer(playerId) as MovementPlayer;
+    if (!player) {
+      console.error(`Player not found: ${playerId}`);
+      return null;
+    }
+
+    if (player.coins < item.cost) {
+      console.error(`Insufficient coins. Need ${item.cost}, have ${player.coins}`);
+      return null;
+    }
+
+    // 3. Deduct coins
+    player.coins -= item.cost;
+
+    // 4. Create placed object
+    const placedObject: PlacedObject = {
+      id: `obj-${this.nextObjectId++}`,
+      itemId: item.id,
+      x,
+      y,
+      mapId,
+      placedBy: playerId,
+      placedAt: Date.now()
+    };
+
+    // 5. Add to array
+    this.placedObjects.push(placedObject);
+
+    console.log(`Player ${playerId} placed ${itemId} at (${x}, ${y}) on ${mapId}`);
+    return placedObject;
   }
 }

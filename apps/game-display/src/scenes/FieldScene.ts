@@ -26,12 +26,13 @@ interface PlayerContainer {
   currentDirection: string;
 }
 
-export class InteriorScene extends Phaser.Scene {
+export class FieldScene extends Phaser.Scene {
   private playerSprites: Map<string, PlayerContainer> = new Map();
   private placedObjectSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private followingPlayerId: string | null = null;
 
   constructor() {
-    super({ key: 'InteriorScene' });
+    super({ key: 'FieldScene' });
   }
 
   preload() {
@@ -41,13 +42,13 @@ export class InteriorScene extends Phaser.Scene {
       frameHeight: 48
     });
 
-    // Load tilemap
-    this.load.tilemapTiledJSON('interiorMap', '/assets/sprout-land/tilemaps/house-interior.json');
+    // Load field tilemap
+    this.load.tilemapTiledJSON('fieldMap', '/assets/sprout-land/tilemaps/field-interior.json');
 
     // Load tilesets
     this.load.image('tilled-dirt', '/assets/sprout-land/Tilesets/Tilled_Dirt.png');
-    this.load.image('wooden-house-walls', '/assets/sprout-land/Tilesets/Wooden_House_Walls_Tilset.png');
-    this.load.image('basic-furniture', '/assets/sprout-land/Objects/Basic_Furniture.png');
+    this.load.image('grass', '/assets/sprout-land/Tilesets/Grass.png');
+    this.load.image('water', '/assets/sprout-land/Tilesets/Water.png');
 
     // Load object spritesheets for placed objects
     this.load.spritesheet('grass-biom-sprites', '/assets/sprout-land/Objects/Basic_Grass_Biom_things.png', {
@@ -63,8 +64,8 @@ export class InteriorScene extends Phaser.Scene {
     this.load.on('complete', () => {
       this.textures.get('character').setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.textures.get('tilled-dirt').setFilter(Phaser.Textures.FilterMode.NEAREST);
-      this.textures.get('wooden-house-walls').setFilter(Phaser.Textures.FilterMode.NEAREST);
-      this.textures.get('basic-furniture').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      this.textures.get('grass').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      this.textures.get('water').setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.textures.get('grass-biom-sprites').setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.textures.get('basic-furniture-sprites').setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
@@ -72,37 +73,41 @@ export class InteriorScene extends Phaser.Scene {
 
   create() {
     // Create tilemap
-    const map = this.make.tilemap({ key: 'interiorMap' });
+    const map = this.make.tilemap({ key: 'fieldMap' });
 
     // Add tilesets (names must match JSON)
     const dirtTileset = map.addTilesetImage('Tilled_Dirt', 'tilled-dirt');
-    const wallsTileset = map.addTilesetImage('Wooden_House_Walls_Tilset', 'wooden-house-walls');
-    const furnitureTileset = map.addTilesetImage('Basic_Furniture', 'basic-furniture');
+    const grassTileset = map.addTilesetImage('Grass', 'grass');
+    const waterTileset = map.addTilesetImage('Water', 'water');
 
     // Create layers (bottom to top) - pass all tilesets to each layer
-    const allTilesets = [dirtTileset!, wallsTileset!, furnitureTileset!];
-    const floorLayer = map.createLayer('Floor', allTilesets, 0, 0);
-    const wallsLayer = map.createLayer('Walls', allTilesets, 0, 0);
-    const furnitureLayer = map.createLayer('Furniture', allTilesets, 0, 0);
+    const allTilesets = [dirtTileset!, grassTileset!, waterTileset!];
+    const groundLayer = map.createLayer('Ground', allTilesets, 0, 0);
+    const terrainLayer = map.createLayer('Terrain', allTilesets, 0, 0);
+    const decorationsLayer = map.createLayer('Decorations', allTilesets, 0, 0);
 
     // Scale layers to 4x
-    floorLayer?.setScale(4);
-    wallsLayer?.setScale(4);
-    furnitureLayer?.setScale(4);
+    groundLayer?.setScale(4);
+    terrainLayer?.setScale(4);
+    decorationsLayer?.setScale(4);
 
-    // Set world bounds to match scaled map
-    const worldWidth = 576;  // 15 tiles * 16 * 4
-    const worldHeight = 640; // 10 tiles * 16 * 4
+    // Set world bounds to match scaled map (12 tiles wide x 40 tiles tall)
+    const worldWidth = 768;   // 12 tiles * 16 * 4
+    const worldHeight = 2560; // 40 tiles * 16 * 4
     this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
     // Setup camera
     this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
     this.cameras.main.setBackgroundColor('#1a1a2e');
 
-    // Create sprite animations
+    // Camera will follow the player when they're created
+    // Deadzone keeps player in center area while allowing some movement
+    this.cameras.main.setDeadzone(200, 150);
+
+    // Create animations
     this.createAnimations();
 
-    // Listen for state updates
+    // Setup state update listener
     this.events.on('state-update', this.handleStateUpdate, this);
   }
 
@@ -136,7 +141,7 @@ export class InteriorScene extends Phaser.Scene {
       repeat: -1
     });
 
-    // Walk animations
+    // Walking animations
     this.anims.create({
       key: 'walk-down',
       frames: this.anims.generateFrameNumbers('character', { start: 2, end: 3 }),
@@ -169,107 +174,107 @@ export class InteriorScene extends Phaser.Scene {
   private handleStateUpdate(state: GameState): void {
     const players = state.players as Record<string, MovementPlayerData>;
 
-    // Only show players in interior (not on main map)
-    const interiorPlayers = Object.values(players).filter(
-      p => p.customData.currentMapId && p.customData.currentMapId !== 'main'
+    // Filter to only show players in field (currentMapId starts with "field-")
+    const fieldPlayers = Object.values(players).filter(
+      p => p.customData.currentMapId && p.customData.currentMapId.startsWith('field-')
     );
 
-    // Update existing and create new
-    interiorPlayers.forEach(player => {
-      if (!this.playerSprites.has(player.id)) {
-        this.createPlayerSprite(player);
-      } else {
+    // Update or create player sprites
+    fieldPlayers.forEach(player => {
+      if (this.playerSprites.has(player.id)) {
         this.updatePlayerSprite(player);
+      } else {
+        this.createPlayerSprite(player);
       }
     });
 
-    // Remove players who left interior or disconnected
+    // Remove players who left the field
     this.playerSprites.forEach((playerData, playerId) => {
-      const stillInInterior = interiorPlayers.find(p => p.id === playerId);
-      if (!stillInInterior) {
+      const stillInField = fieldPlayers.find(p => p.id === playerId);
+      if (!stillInField) {
         playerData.container.destroy();
         this.playerSprites.delete(playerId);
+
+        // If this was the player we were following, stop following
+        if (this.followingPlayerId === playerId) {
+          this.followingPlayerId = null;
+        }
       }
     });
 
-    // Update placed objects
-    const placedObjects = (state.gameData?.placedObjects || []) as Array<any>;
+    // Make camera follow the first player in the field
+    if (fieldPlayers.length > 0 && !this.followingPlayerId) {
+      const firstPlayer = fieldPlayers[0];
+      const playerSprite = this.playerSprites.get(firstPlayer.id);
+      if (playerSprite) {
+        // Instantly center camera on player first time (no smooth transition)
+        this.cameras.main.centerOn(playerSprite.container.x, playerSprite.container.y);
 
-    // Filter for interior objects only (not main map)
-    const interiorObjects = placedObjects.filter(
-      (obj: any) => obj.mapId !== 'main' && obj.mapId.startsWith('interior-')
+        // Then start smooth following for subsequent movement
+        this.cameras.main.startFollow(playerSprite.container, true, 0.1, 0.1);
+        this.followingPlayerId = firstPlayer.id;
+      }
+    }
+
+    // Handle placed objects in field
+    const placedObjects = ((state.gameData as any)?.placedObjects || []).filter(
+      (obj: any) => obj.mapId && obj.mapId.startsWith('field-')
     );
 
-    // Create new placed object sprites
-    interiorObjects.forEach((obj: any) => {
+    placedObjects.forEach((obj: any) => {
       if (!this.placedObjectSprites.has(obj.id)) {
         this.createPlacedObjectSprite(obj);
       }
     });
 
-    // Remove placed objects no longer in state
-    const objectIds = new Set(interiorObjects.map((o: any) => o.id));
-    this.placedObjectSprites.forEach((sprite, objId) => {
-      if (!objectIds.has(objId)) {
+    const objectIds = new Set(placedObjects.map((obj: any) => obj.id));
+    this.placedObjectSprites.forEach((sprite, id) => {
+      if (!objectIds.has(id)) {
         sprite.destroy();
-        this.placedObjectSprites.delete(objId);
+        this.placedObjectSprites.delete(id);
       }
     });
 
-    // Update depth sorting for all sprites
     this.updateDepthSorting();
   }
 
   private createPlacedObjectSprite(obj: any): void {
-    // Get item definition from store config
     const item = STORE_CONFIG.placeableItems.find(i => i.id === obj.itemId);
     if (!item) {
       console.error(`Unknown item: ${obj.itemId}`);
       return;
     }
 
-    // Calculate frame: use column/row if provided, otherwise use frame directly
-    let frameIndex: number;
+    let frame: number;
     if (item.column !== undefined && item.row !== undefined && item.columns !== undefined) {
-      frameIndex = item.row * item.columns + item.column;
+      frame = item.row * item.columns + item.column;
     } else if (item.frame !== undefined) {
-      frameIndex = item.frame;
+      frame = item.frame;
     } else {
       console.error(`Item ${item.id} missing both frame and column/row configuration`);
       return;
     }
 
-    // Create sprite using item's spritesheet and calculated frame
-    const sprite = this.add.sprite(obj.x, obj.y, item.spritesheet, frameIndex);
-    sprite.setScale(4); // Match tilemap scale
+    const sprite = this.add.sprite(obj.x, obj.y, item.spritesheet, frame);
+    sprite.setScale(4);
 
-    // Apply color tint if specified
     if (item.color) {
       sprite.setTint(parseInt(item.color.replace('#', '0x')));
     }
 
-    // Store placed object data on sprite for depth sorting
     (sprite as any).__placedObjectData = obj;
-
     this.placedObjectSprites.set(obj.id, sprite);
   }
 
   private createPlayerSprite(player: MovementPlayerData): void {
-    const container = this.add.container(
-      player.customData.x,
-      player.customData.y
-    );
+    const container = this.add.container(player.customData.x, player.customData.y);
 
-    // Create animated sprite
     const sprite = this.add.sprite(0, 0, 'character');
-    sprite.setScale(4.0);
+    sprite.setScale(4);
     sprite.setOrigin(0.5, 0.5);
     sprite.play('idle-down');
 
-    // Calculate sprite dimensions for text positioning
     const spriteHeight = sprite.displayHeight;
-
-    // Add name text above sprite
     const nameText = this.add.text(0, -spriteHeight / 2 - 20, player.name, {
       fontSize: '16px',
       color: player.color,
@@ -279,9 +284,8 @@ export class InteriorScene extends Phaser.Scene {
     });
     nameText.setOrigin(0.5, 1);
 
-    // Add to container
     container.add([sprite, nameText]);
-    container.setDepth(1000); // Make sure it's on top
+    container.setDepth(1000);
 
     this.playerSprites.set(player.id, {
       container,
@@ -292,97 +296,76 @@ export class InteriorScene extends Phaser.Scene {
   }
 
   private updatePlayerSprite(player: MovementPlayerData): void {
-    const playerData = this.playerSprites.get(player.id);
-    if (!playerData) return;
+    const playerSprite = this.playerSprites.get(player.id);
+    if (!playerSprite) return;
 
-    // Update position
-    playerData.container.x = player.customData.x;
-    playerData.container.y = player.customData.y;
+    playerSprite.container.x = player.customData.x;
+    playerSprite.container.y = player.customData.y;
 
-    // Update animation based on velocity
     const vx = player.customData.vx;
     const vy = player.customData.vy;
 
-    const isMoving = Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01;
-
-    if (isMoving) {
-      // Determine primary direction
-      let newDirection = playerData.currentDirection;
+    if (Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01) {
+      // Moving - update direction and play walk animation
+      let direction = playerSprite.currentDirection;
 
       if (Math.abs(vx) > Math.abs(vy)) {
-        newDirection = vx > 0 ? 'right' : 'left';
+        direction = vx > 0 ? 'right' : 'left';
       } else {
-        newDirection = vy > 0 ? 'down' : 'up';
+        direction = vy > 0 ? 'down' : 'up';
       }
 
-      // Update animation if direction changed
-      if (newDirection !== playerData.currentDirection) {
-        playerData.currentDirection = newDirection;
-        playerData.sprite.play(`walk-${newDirection}`, true);
-      } else if (!playerData.sprite.anims.isPlaying) {
-        playerData.sprite.play(`walk-${newDirection}`, true);
+      if (direction !== playerSprite.currentDirection) {
+        playerSprite.currentDirection = direction;
+        playerSprite.sprite.play(`walk-${direction}`, true);
+      } else if (!playerSprite.sprite.anims.isPlaying) {
+        playerSprite.sprite.play(`walk-${direction}`, true);
       }
     } else {
-      // Play idle animation for current direction
-      const idleAnim = `idle-${playerData.currentDirection}`;
-      if (playerData.sprite.anims.currentAnim?.key !== idleAnim) {
-        playerData.sprite.play(idleAnim, true);
+      // Idle
+      const idleAnim = `idle-${playerSprite.currentDirection}`;
+      if (playerSprite.sprite.anims.currentAnim?.key !== idleAnim) {
+        playerSprite.sprite.play(idleAnim, true);
       }
     }
   }
 
   private updateDepthSorting(): void {
-    // Separate placed objects into two groups
-    const underPlayerObjects: Phaser.GameObjects.Sprite[] = [];
-    const depthSortedObjects: Phaser.GameObjects.Sprite[] = [];
+    const underObjects: Phaser.GameObjects.Sprite[] = [];
+    const normalObjects: Phaser.GameObjects.Sprite[] = [];
 
-    this.placedObjectSprites.forEach((sprite) => {
-      // Get the placed object data from game state to check its item config
-      const placedObj = (sprite as any).__placedObjectData;
-      if (placedObj) {
-        const item = STORE_CONFIG.placeableItems.find(i => i.id === placedObj.itemId);
+    this.placedObjectSprites.forEach(sprite => {
+      const data = (sprite as any).__placedObjectData;
+      if (data) {
+        const item = STORE_CONFIG.placeableItems.find(i => i.id === data.itemId);
         if (item?.alwaysUnderPlayer) {
-          underPlayerObjects.push(sprite);
+          underObjects.push(sprite);
         } else {
-          depthSortedObjects.push(sprite);
+          normalObjects.push(sprite);
         }
       } else {
-        // Default to depth sorting if no data found
-        depthSortedObjects.push(sprite);
+        normalObjects.push(sprite);
       }
     });
 
-    // Set fixed depth for objects that should always be under players
-    underPlayerObjects.forEach((sprite, index) => {
+    underObjects.forEach((sprite, index) => {
       sprite.setDepth(index);
     });
 
-    const baseDepth = underPlayerObjects.length;
+    const baseDepth = underObjects.length;
+    const sortableObjects: { obj: Phaser.GameObjects.Container | Phaser.GameObjects.Sprite, y: number }[] = [];
 
-    // Sort players and depth-sorted placed objects by Y position
-    const allSprites: Array<{ obj: any; y: number }> = [];
-
-    // Add players
-    this.playerSprites.forEach(playerData => {
-      allSprites.push({
-        obj: playerData.container,
-        y: playerData.container.y
-      });
+    this.playerSprites.forEach(player => {
+      sortableObjects.push({ obj: player.container, y: player.container.y });
     });
 
-    // Add placed objects that depth-sort with players
-    depthSortedObjects.forEach(sprite => {
-      allSprites.push({
-        obj: sprite,
-        y: sprite.y
-      });
+    normalObjects.forEach(sprite => {
+      sortableObjects.push({ obj: sprite, y: sprite.y });
     });
 
-    // Sort by Y position
-    allSprites.sort((a, b) => a.y - b.y);
+    sortableObjects.sort((a, b) => a.y - b.y);
 
-    // Update depths for sorted sprites (offset by baseDepth)
-    allSprites.forEach((item, index) => {
+    sortableObjects.forEach((item, index) => {
       item.obj.setDepth(baseDepth + index);
     });
   }

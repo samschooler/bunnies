@@ -159,13 +159,15 @@ export class MovementPlayer extends BasePlayer {
     return false; // No collision
   }
 
-  public checkPortalCollision(mainPortals: Portal[], interiorPortals: Portal[]): Portal | null {
+  public checkPortalCollision(mainPortals: Portal[], interiorPortals: Portal[], fieldPortals: Portal[]): Portal | null {
     let portalsToCheck: Portal[] = [];
 
     if (this.currentMapId === 'main') {
       portalsToCheck = mainPortals;
-    } else {
+    } else if (this.currentMapId.startsWith('interior-')) {
       portalsToCheck = interiorPortals;
+    } else if (this.currentMapId.startsWith('field-')) {
+      portalsToCheck = fieldPortals;
     }
 
     // AABB collision

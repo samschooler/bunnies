@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GameState } from '@party-game/shared-types';
+import { GameState, STORE_CONFIG } from '@party-game/shared-types';
 
 interface MovementPlayerData {
   id: string;
@@ -32,8 +32,9 @@ export class MainScene extends Phaser.Scene {
   private coinSprites: Map<string, Phaser.GameObjects.Arc> = new Map();
   private staticObjectSprites: Phaser.GameObjects.Sprite[] = [];
   private aboveSprites: Phaser.GameObjects.Sprite[] = []; // Sprites that render above players
+  private placedObjectSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private debugGraphics?: Phaser.GameObjects.Graphics;
-  private showDebug: boolean = true; // Toggle to show/hide collision boxes
+  private showDebug: boolean = false; // Toggle to show/hide collision boxes
 
   constructor() {
     super({ key: 'MainScene' });
@@ -97,6 +98,10 @@ export class MainScene extends Phaser.Scene {
       frameWidth: 16,
       frameHeight: 16
     });
+    this.load.spritesheet('basic-furniture-sprites', '/assets/sprout-land/Objects/Basic_Furniture.png', {
+      frameWidth: 16,
+      frameHeight: 16
+    });
 
     // Set pixel-perfect filter after load
     this.load.on('complete', () => {
@@ -123,6 +128,7 @@ export class MainScene extends Phaser.Scene {
       this.textures.get('wooden-house-sprites').setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.textures.get('wooden-house-roof-sprites').setFilter(Phaser.Textures.FilterMode.NEAREST);
       this.textures.get('wooden-house-walls-sprites').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      this.textures.get('basic-furniture-sprites').setFilter(Phaser.Textures.FilterMode.NEAREST);
     });
   }
 
@@ -465,7 +471,34 @@ export class MainScene extends Phaser.Scene {
   }
 
   private updateDepthSorting(): void {
-    // Sort all player containers and static object sprites by Y position
+    // Separate placed objects into two groups
+    const underPlayerObjects: Phaser.GameObjects.Sprite[] = [];
+    const depthSortedObjects: Phaser.GameObjects.Sprite[] = [];
+
+    this.placedObjectSprites.forEach((sprite) => {
+      // Get the placed object data from game state to check its item config
+      const placedObj = (sprite as any).__placedObjectData;
+      if (placedObj) {
+        const item = STORE_CONFIG.placeableItems.find(i => i.id === placedObj.itemId);
+        if (item?.alwaysUnderPlayer) {
+          underPlayerObjects.push(sprite);
+        } else {
+          depthSortedObjects.push(sprite);
+        }
+      } else {
+        // Default to depth sorting if no data found
+        depthSortedObjects.push(sprite);
+      }
+    });
+
+    // Set fixed depth for objects that should always be under players
+    underPlayerObjects.forEach((sprite, index) => {
+      sprite.setDepth(index);
+    });
+
+    const baseDepth = underPlayerObjects.length;
+
+    // Sort players, static objects, and depth-sorted placed objects by Y position
     const allSprites: Array<{ obj: any; y: number }> = [];
 
     // Add players
@@ -484,16 +517,24 @@ export class MainScene extends Phaser.Scene {
       });
     });
 
+    // Add placed objects that depth-sort with players
+    depthSortedObjects.forEach(sprite => {
+      allSprites.push({
+        obj: sprite,
+        y: sprite.y
+      });
+    });
+
     // Sort by Y position
     allSprites.sort((a, b) => a.y - b.y);
 
-    // Update depths for sorted sprites
+    // Update depths for sorted sprites (offset by baseDepth)
     allSprites.forEach((item, index) => {
-      item.obj.setDepth(index);
+      item.obj.setDepth(baseDepth + index);
     });
 
     // Set above sprites to render on top (higher depth than all sorted sprites)
-    const aboveDepthStart = allSprites.length;
+    const aboveDepthStart = baseDepth + allSprites.length;
     this.aboveSprites.forEach((sprite, index) => {
       sprite.setDepth(aboveDepthStart + index);
     });
@@ -569,6 +610,30 @@ export class MainScene extends Phaser.Scene {
       }
     });
 
+    // Update placed objects
+    const placedObjects = (state.gameData?.placedObjects || []) as Array<any>;
+
+    // Filter for main map objects only
+    const mainMapObjects = placedObjects.filter(
+      (obj: any) => obj.mapId === 'main'
+    );
+
+    // Create new placed object sprites
+    mainMapObjects.forEach((obj: any) => {
+      if (!this.placedObjectSprites.has(obj.id)) {
+        this.createPlacedObjectSprite(obj);
+      }
+    });
+
+    // Remove placed objects no longer in state
+    const objectIds = new Set(mainMapObjects.map((o: any) => o.id));
+    this.placedObjectSprites.forEach((sprite, objId) => {
+      if (!objectIds.has(objId)) {
+        sprite.destroy();
+        this.placedObjectSprites.delete(objId);
+      }
+    });
+
     // Update depth sorting for all sprites
     this.updateDepthSorting();
   }
@@ -576,6 +641,40 @@ export class MainScene extends Phaser.Scene {
   private createCoin(coin: { id: string, x: number, y: number }): void {
     const circle = this.add.circle(coin.x, coin.y, 10, 0xFFD700);
     this.coinSprites.set(coin.id, circle);
+  }
+
+  private createPlacedObjectSprite(obj: any): void {
+    // Get item definition from store config
+    const item = STORE_CONFIG.placeableItems.find(i => i.id === obj.itemId);
+    if (!item) {
+      console.error(`Unknown item: ${obj.itemId}`);
+      return;
+    }
+
+    // Calculate frame: use column/row if provided, otherwise use frame directly
+    let frameIndex: number;
+    if (item.column !== undefined && item.row !== undefined && item.columns !== undefined) {
+      frameIndex = item.row * item.columns + item.column;
+    } else if (item.frame !== undefined) {
+      frameIndex = item.frame;
+    } else {
+      console.error(`Item ${item.id} missing both frame and column/row configuration`);
+      return;
+    }
+
+    // Create sprite using item's spritesheet and calculated frame
+    const sprite = this.add.sprite(obj.x, obj.y, item.spritesheet, frameIndex);
+    sprite.setScale(4); // Match tilemap scale
+
+    // Apply color tint if specified
+    if (item.color) {
+      sprite.setTint(parseInt(item.color.replace('#', '0x')));
+    }
+
+    // Store placed object data on sprite for depth sorting
+    (sprite as any).__placedObjectData = obj;
+
+    this.placedObjectSprites.set(obj.id, sprite);
   }
 
   private createPlayerSprite(player: MovementPlayerData): void {

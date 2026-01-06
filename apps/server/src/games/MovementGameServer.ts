@@ -14,6 +14,10 @@ export class MovementGameServer extends GameServer {
       socket.on('player:purchase', (upgradeType: string) => {
         this.handlePurchase(socket, upgradeType);
       });
+
+      socket.on('player:placeObject', (data: { itemId: string, x: number, y: number, mapId: string }) => {
+        this.handlePlaceObject(socket, data);
+      });
     });
   }
 
@@ -33,6 +37,40 @@ export class MovementGameServer extends GameServer {
     if (success) {
       console.log(`Player ${playerId} purchased ${upgradeType}`);
       // State will be synced in the next update loop
+    }
+  }
+
+  private handlePlaceObject(
+    socket: Socket,
+    data: { itemId: string, x: number, y: number, mapId: string }
+  ): void {
+    const playerId = (socket as any).playerId;
+    const roomId = (socket as any).roomId;
+
+    if (!playerId || !roomId) {
+      console.error('Missing playerId or roomId');
+      return;
+    }
+
+    const gameState = this.gameStates.get(roomId);
+    if (!gameState) {
+      console.error(`Game state not found for room ${roomId}`);
+      return;
+    }
+
+    const result = (gameState as MovementGameState).placeObject(
+      playerId,
+      data.itemId,
+      data.x,
+      data.y,
+      data.mapId
+    );
+
+    if (result) {
+      console.log(`Successfully placed object ${result.id}`);
+      // State will sync automatically in next update loop
+    } else {
+      console.error('Failed to place object');
     }
   }
 

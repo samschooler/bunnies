@@ -7,11 +7,13 @@ interface PlayerState {
   speed: number;
   color: string;
   currentMapId?: string;
+  x?: number;
+  y?: number;
 }
 
 interface MovementControllerCallbacks {
   onJoined: (playerId: string) => void;
-  onSessionRestored: (playerId: string) => void;
+  onSessionRestored: (playerId: string, playerName: string) => void;
   onError: (error: string) => void;
   onStateUpdate?: (playerState: PlayerState) => void;
 }
@@ -42,7 +44,9 @@ export class MovementController extends BaseController {
         size: playerData.customData.size || 1,
         speed: playerData.customData.speed || 1,
         color: playerData.color,
-        currentMapId: playerData.customData.currentMapId
+        currentMapId: playerData.customData.currentMapId,
+        x: playerData.customData.x,
+        y: playerData.customData.y
       };
 
       if (this.callbacks.onStateUpdate) {
@@ -59,12 +63,26 @@ export class MovementController extends BaseController {
     this.socket.emit('player:purchase' as any, upgradeType);
   }
 
+  placeObject(itemId: string): void {
+    if (!this.playerState.x || !this.playerState.y) {
+      console.error('Player position not available');
+      return;
+    }
+
+    this.socket.emit('player:placeObject' as any, {
+      itemId,
+      x: this.playerState.x,
+      y: this.playerState.y,
+      mapId: this.playerState.currentMapId || 'main'
+    });
+  }
+
   onJoined(playerId: string, playerData: any): void {
     this.callbacks.onJoined(playerId);
   }
 
   onSessionRestored(playerId: string, playerData: any): void {
-    this.callbacks.onSessionRestored(playerId);
+    this.callbacks.onSessionRestored(playerId, playerData?.name || 'Player');
   }
 
   onError(error: string): void {

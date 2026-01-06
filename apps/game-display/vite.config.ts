@@ -13,7 +13,8 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         landing: path.resolve(__dirname, 'index.landing.html'),
-        interior: path.resolve(__dirname, 'interior.html')
+        interior: path.resolve(__dirname, 'interior.html'),
+        field: path.resolve(__dirname, 'field.html')
       }
     }
   },

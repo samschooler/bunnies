@@ -16,6 +16,8 @@ interface PlayerState {
   speed: number;
   color: string;
   currentMapId?: string;
+  x?: number;
+  y?: number;
 }
 
 export default function GameController({ controller, playerName, roomCode, displayUrl }: GameControllerProps) {
@@ -151,60 +153,61 @@ export default function GameController({ controller, playerName, roomCode, displ
     <div className="game-controller">
       <div className="controller-header">
         <h3>{playerName}</h3>
-        <div className="coin-display">
-          Coins: <span className="coin-count">{playerState.coins}</span>
-        </div>
-        <button className="store-button" onClick={() => setShowStore(!showStore)}>
-          Store
-        </button>
       </div>
+
+      <div className="coin-display">
+        💰 <span className="coin-count">{playerState.coins}</span>
+      </div>
+
+      <button className="store-button" onClick={() => setShowStore(!showStore)}>
+        🏪
+      </button>
 
       {showStore && (
         <div className="store-modal">
           <div className="store-content">
             <h2>Upgrade Store</h2>
             <div className="store-items">
-              {Object.entries(STORE_CONFIG.upgrades).map(([key, upgrade]) => {
-                const cost = calculateUpgradeCost(key, playerState);
-                const currentValue = key === 'size' ? playerState.size : playerState.speed;
+              {Object.entries(STORE_CONFIG.upgrades)
+                .filter(([key]) => key === 'speed')
+                .map(([key, upgrade]) => {
+                  const cost = calculateUpgradeCost(key, playerState);
+                  const currentValue = playerState.speed;
 
-                return (
-                  <div key={key} className="store-item">
-                    <h3>{upgrade.name}</h3>
-                    <p>{upgrade.description}</p>
-                    <p>Current: {currentValue.toFixed(1)}x</p>
-                    <p>Cost: {cost} coins</p>
-                    <button
-                      onClick={() => handlePurchase(key)}
-                      disabled={playerState.coins < cost}
-                    >
-                      Upgrade (+{upgrade.effect.increment}x)
-                    </button>
-                  </div>
-                );
-              })}
-
-              <div className="store-section">
-                <h3>Premium Colors</h3>
-                <div className="color-grid">
-                  {STORE_CONFIG.premiumColors.map(c => (
-                    <div key={c.color} className="color-item">
-                      <div
-                        className="color-preview"
-                        style={{ backgroundColor: c.color }}
-                      />
-                      <span>{c.name}</span>
+                  return (
+                    <div key={key} className="store-item">
+                      <h3>{upgrade.name}</h3>
+                      <p>{upgrade.description}</p>
+                      <p>Current: {currentValue.toFixed(1)}x</p>
+                      <p>Cost: {cost} coins</p>
                       <button
-                        onClick={() => handlePurchase(`color:${c.color}`)}
-                        disabled={playerState.coins < c.cost || playerState.color === c.color}
+                        onClick={() => handlePurchase(key)}
+                        disabled={playerState.coins < cost}
                       >
-                        {playerState.color === c.color ? 'Owned' : `${c.cost} coins`}
+                        Upgrade (+{upgrade.effect.increment}x)
                       </button>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  );
+                })}
             </div>
+
+            <h2>Placeable Objects</h2>
+            <div className="store-items">
+              {STORE_CONFIG.placeableItems.map(item => (
+                <div key={item.id} className="store-item">
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                  <p>Cost: {item.cost} coins</p>
+                  <button
+                    onClick={() => controller.placeObject(item.id)}
+                    disabled={playerState.coins < item.cost}
+                  >
+                    Place at Current Position
+                  </button>
+                </div>
+              ))}
+            </div>
+
             <button className="close-store" onClick={() => setShowStore(false)}>
               Close
             </button>
@@ -212,12 +215,22 @@ export default function GameController({ controller, playerName, roomCode, displ
         </div>
       )}
 
-      {currentMapId !== 'main' && (
+      {currentMapId.startsWith('interior-') && (
         <div className="interior-display">
           <iframe
             src={`${displayUrl}/interior.html?roomCode=${roomCode}`}
             className="mini-display-frame"
             title="House Interior"
+          />
+        </div>
+      )}
+
+      {currentMapId.startsWith('field-') && (
+        <div className="interior-display">
+          <iframe
+            src={`${displayUrl}/field.html?roomCode=${roomCode}`}
+            className="mini-display-frame"
+            title="Field"
           />
         </div>
       )}
