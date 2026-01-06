@@ -1,6 +1,10 @@
 // games/demo/src/index.ts
 export const DEMO_GAME_ID = 'demo';
 
-// Will be populated in subsequent tasks
+// Server exports
 export { DemoServer } from './server/DemoServer.js';
-export { DemoScene } from './display/DemoScene.js';
+export { DemoGameState } from './server/DemoGameState.js';
+export { DemoPlayer } from './server/DemoPlayer.js';
+
+// Display exports will be added in subsequent tasks
+// export { DemoScene } from './display/DemoScene.js';
