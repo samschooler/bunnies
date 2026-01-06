@@ -1,10 +1,17 @@
 // games/demo/src/index.ts
-export const DEMO_GAME_ID = 'demo';
+import type { GameDefinition } from '@party-game/shared-types';
+import { DemoServer } from './server/index.js';
+import { DemoScene } from './display/index.js';
 
-// Server exports
-export { DemoServer } from './server/DemoServer.js';
-export { DemoGameState } from './server/DemoGameState.js';
-export { DemoPlayer } from './server/DemoPlayer.js';
+export const game: GameDefinition = {
+  id: 'demo',
+  name: 'Demo',
+  maxPlayers: 12,
+  createServer: (io, roomCode) => new DemoServer(io),
+  scenes: [DemoScene],
+  entryScene: 'DemoScene',
+  assetPath: '/games/demo/assets'
+};
 
-// Display exports will be added in subsequent tasks
-// export { DemoScene } from './display/DemoScene.js';
+export { DemoServer } from './server/index.js';
+export { DemoScene } from './display/index.js';
