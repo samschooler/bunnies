@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "games/*"
   ],
   "scripts": {
     "dev": "turbo run dev",
