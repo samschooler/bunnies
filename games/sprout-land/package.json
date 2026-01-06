@@ -1,0 +1,20 @@
+{
+  "name": "@games/sprout-land",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@party-game/game-framework": "*",
+    "@party-game/shared-types": "*",
+    "phaser": "^3.70.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
