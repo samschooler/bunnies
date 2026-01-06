@@ -1,51 +1,82 @@
+// apps/game-display/src/main.ts
 import Phaser from 'phaser';
-import { URLBuilder } from '@party-game/shared-types';
-import { MainScene } from './scenes/MainScene';
-import { MovementGameDisplay } from './game/MovementGameDisplay';
+import { URLBuilder, initializeGames, registry } from '@party-game/shared-types';
+import { showGameSelector } from './pages/GameSelector';
+import { showNotFound } from './pages/NotFound';
 
-const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
-  width: 1920,
-  height: 1080,
-  backgroundColor: '#1a1a2e',
-  parent: document.body,
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  },
-  scene: [MainScene]
-};
+async function main() {
+  await initializeGames();
 
-const game = new Phaser.Game(config);
+  const urlBuilder = new URLBuilder({
+    serverUrl: import.meta.env.VITE_GAME_SERVER_URL,
+    displayUrl: import.meta.env.VITE_GAME_DISPLAY_URL,
+    controllerUrl: import.meta.env.VITE_GAME_CONTROLLER_URL
+  });
 
-// Create URLBuilder instance
-const urlBuilder = new URLBuilder({
-  serverUrl: import.meta.env.VITE_GAME_SERVER_URL,
-  displayUrl: import.meta.env.VITE_GAME_DISPLAY_URL,
-  controllerUrl: import.meta.env.VITE_GAME_CONTROLLER_URL
-});
+  const path = window.location.pathname;
+  const pathParts = path.split('/').filter(Boolean);
 
-const serverUrl = urlBuilder.getServerUrl();
+  // Check if it's a room join: /room/AX7K2
+  if (pathParts[0] === 'room' && pathParts[1]) {
+    const parsed = registry.parseRoomCode(pathParts[1]);
+    if (parsed) {
+      await bootGame(parsed.gameId, parsed.roomCode, urlBuilder);
+    } else {
+      showNotFound('Invalid room code');
+    }
+    return;
+  }
 
-// Parse room code from URL path
-const path = window.location.pathname;
-const roomCodeMatch = path.match(/^\/([A-Z0-9]{4})$/i);
-const roomCode = roomCodeMatch ? roomCodeMatch[1].toUpperCase() : null;
+  // Check if it's a game path: /demo/ or /sprout-land/
+  if (pathParts[0]) {
+    const game = registry.getGame(pathParts[0]);
+    if (game) {
+      // Create new room for this game
+      await bootGame(game.id, null, urlBuilder);
+      return;
+    }
+  }
 
-// Only initialize game if we have a room code
-if (roomCode) {
-  // Initialize game display connection
-  const gameDisplay = new MovementGameDisplay(serverUrl, game, urlBuilder);
+  // Root path: show game selector
+  if (!pathParts[0]) {
+    const games = registry.getAllGames().map(g => ({ id: g.id, name: g.name }));
+    showGameSelector(games);
+    return;
+  }
 
-  // Join room with the code from URL
-  console.log(`Joining room: ${roomCode}`);
-  gameDisplay.joinRoom(roomCode);
-
-  // Make it available globally for debugging
-  (window as any).gameDisplay = gameDisplay;
-} else {
-  // No room code - this shouldn't happen because routing should handle it
-  // But just in case, redirect to landing page
-  console.error('No room code found in URL');
-  window.location.href = '/';
+  // Unknown path: 404
+  showNotFound('Game not found');
 }
+
+async function bootGame(gameId: string, roomCode: string | null, urlBuilder: URLBuilder) {
+  const game = registry.getGame(gameId);
+  if (!game) {
+    showNotFound('Game not found');
+    return;
+  }
+
+  const config: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    backgroundColor: '#1a1a2e',
+    parent: document.body,
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    scene: game.scenes
+  };
+
+  const phaserGame = new Phaser.Game(config);
+
+  // Pass connection info to the scene
+  phaserGame.scene.start(game.entryScene, {
+    socketNamespace: `/${gameId}`,
+    assetPath: game.assetPath,
+    roomCode,
+    serverUrl: urlBuilder.getServerUrl()
+  });
+}
+
+main().catch(console.error);

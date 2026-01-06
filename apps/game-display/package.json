@@ -11,6 +11,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@games/demo": "*",
+    "@games/sprout-land": "*",
     "@party-game/game-framework": "*",
     "@party-game/shared-types": "*",
     "phaser": "^3.70.0",
