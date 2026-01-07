@@ -1,11 +1,11 @@
-import { GameServer, BaseGameState } from '@party-game/game-framework/server';
+import { GameServer, BaseGameState, GameServerOptions } from '@party-game/game-framework/server';
 import { SproutLandState } from './SproutLandState.js';
 import { SproutLandPlayer } from './SproutLandPlayer.js';
 import { Server, Socket } from 'socket.io';
 
 export class SproutLandServer extends GameServer {
-  constructor(io: Server, serverIp?: string) {
-    super(io, serverIp);
+  constructor(io: Server, options?: GameServerOptions) {
+    super(io, options);
     this.setupCustomEventHandlers();
   }
 

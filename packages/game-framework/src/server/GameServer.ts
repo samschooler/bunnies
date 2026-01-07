@@ -9,21 +9,28 @@ import { RoomManager } from './RoomManager.js';
 import { SessionManager } from './SessionManager.js';
 import { BaseGameState } from './BaseGameState.js';
 
+export interface GameServerOptions {
+  serverIp?: string;
+  skipEventHandlers?: boolean; // For multi-game setups where parent handles room:create
+}
+
 export abstract class GameServer {
   protected io: Server<ClientToServerEvents, ServerToClientEvents>;
-  protected roomManager: RoomManager;
+  public roomManager: RoomManager;
   protected sessionManager: SessionManager;
-  protected gameStates: Map<string, BaseGameState> = new Map();
+  public gameStates: Map<string, BaseGameState> = new Map();
   protected updateInterval: number = 1000 / 60; // 60fps
   protected updateLoops: Map<string, NodeJS.Timeout> = new Map();
   protected serverIp: string | null = null;
 
-  constructor(io: Server, serverIp?: string) {
+  constructor(io: Server, options?: GameServerOptions) {
     this.io = io;
-    this.serverIp = serverIp || null;
+    this.serverIp = options?.serverIp || null;
     this.roomManager = new RoomManager();
     this.sessionManager = new SessionManager();
-    this.setupEventHandlers();
+    if (!options?.skipEventHandlers) {
+      this.setupEventHandlers();
+    }
     this.startCleanupInterval();
   }
 

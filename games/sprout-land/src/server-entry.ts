@@ -6,7 +6,7 @@ export const game: GameDefinition = {
   id: 'sprout-land',
   name: 'Sprout Land',
   maxPlayers: 12,
-  createServer: (io, roomCode) => new SproutLandServer(io),
+  createServer: (io, roomCode) => new SproutLandServer(io, { skipEventHandlers: true }),
   scenes: [], // Scenes loaded client-side only
   entryScene: 'MainScene',
   assetPath: '/games/sprout-land/assets'

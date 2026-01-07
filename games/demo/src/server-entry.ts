@@ -6,7 +6,7 @@ export const game: GameDefinition = {
   id: 'demo',
   name: 'Demo',
   maxPlayers: 12,
-  createServer: (io, roomCode) => new DemoServer(io),
+  createServer: (io, roomCode) => new DemoServer(io, { skipEventHandlers: true }),
   scenes: [], // Scenes loaded client-side only
   entryScene: 'DemoScene',
   assetPath: '/games/demo/assets'
