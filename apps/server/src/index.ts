@@ -86,6 +86,7 @@ async function main() {
           roomId: room.roomId,
           serverIp: localIp
         });
+        socket.emit('room:code', room.roomCode);
 
         console.log(`[${game.id}] Room created: ${roomCode}`);
       });
