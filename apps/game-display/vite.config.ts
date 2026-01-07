@@ -11,10 +11,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: path.resolve(__dirname, 'index.html'),
-        landing: path.resolve(__dirname, 'index.landing.html'),
-        interior: path.resolve(__dirname, 'interior.html'),
-        field: path.resolve(__dirname, 'field.html')
+        main: path.resolve(__dirname, 'index.html')
       }
     }
   },
@@ -42,12 +39,13 @@ export default defineConfig({
         server.middlewares.use((req, _res, next) => {
           const url = req.url || '';
 
-          // Serve landing page at root
-          if (url === '/') {
-            req.url = '/index.landing.html';
+          // All routes now use the main entry point which handles routing internally
+          // Serve game for room codes (5 alphanumeric characters with game prefix)
+          if (/^\/room\/[A-Z0-9]{5}$/i.test(url)) {
+            req.url = '/index.html';
           }
-          // Serve game for room codes (4 alphanumeric characters)
-          else if (/^\/[A-Z0-9]{4}$/i.test(url)) {
+          // Serve game-specific paths
+          else if (/^\/[a-z-]+$/i.test(url) && url !== '/') {
             req.url = '/index.html';
           }
 
