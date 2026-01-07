@@ -74,15 +74,15 @@ async function main() {
         const server = game.createServer(namespace as any, roomCode);
         activeServers.set(roomCode, server);
 
-        // Manually trigger room creation on the server
+        // Manually trigger room creation on the server with pre-generated room code
         server.io = namespace;
-        const room = server.roomManager.createRoom(socket.id);
+        const room = server.roomManager.createRoom(socket.id, roomCode);
         const gameState = server.createGameState(room.roomId);
         server.gameStates.set(room.roomId, gameState);
 
         socket.join(room.roomId);
         socket.emit('room:created', {
-          roomCode: roomCode,
+          roomCode: room.roomCode,
           roomId: room.roomId,
           serverIp: localIp
         });

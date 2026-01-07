@@ -13,20 +13,20 @@ export class RoomManager {
     };
   }
 
-  createRoom(displaySocketId: string): RoomData {
+  createRoom(displaySocketId: string, roomCode?: string): RoomData {
     const roomId = this.generateRoomId();
-    const roomCode = this.generateRoomCode();
+    const finalRoomCode = roomCode || this.generateRoomCode();
 
     const room: RoomData = {
       roomId,
-      roomCode,
+      roomCode: finalRoomCode,
       createdAt: Date.now(),
       displaySocketId,
       playerCount: 0
     };
 
     this.rooms.set(roomId, room);
-    this.roomCodeToId.set(roomCode, roomId);
+    this.roomCodeToId.set(finalRoomCode, roomId);
 
     return room;
   }
