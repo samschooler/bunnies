@@ -1,8 +1,8 @@
 // packages/shared-types/src/games.ts
 import { registry, type GameDefinition } from './game-registry.js';
 
-// Import games - these will be registered at startup
-// In production, this could be dynamic loading
+// Client-side initialization - imports full game code with Phaser scenes
+// Server has its own initialization to avoid bundling Phaser code
 
 let gamesInitialized = false;
 
@@ -15,7 +15,7 @@ export async function initializeGames(): Promise<void> {
     const { game: demoGame } = await import('@games/demo');
     registry.register(demoGame);
   } catch (e) {
-    console.warn('Demo game not available');
+    console.warn('Demo game not available:', e);
   }
 
   try {
@@ -23,7 +23,7 @@ export async function initializeGames(): Promise<void> {
     const { game: sproutLandGame } = await import('@games/sprout-land');
     registry.register(sproutLandGame);
   } catch (e) {
-    console.warn('Sprout Land game not available');
+    console.warn('Sprout Land game not available:', e);
   }
 
   gamesInitialized = true;

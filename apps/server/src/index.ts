@@ -11,7 +11,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { initializeGames, registry } from '@party-game/shared-types';
+import { registry } from '@party-game/shared-types';
 import { getLocalIpAddress } from './utils/network.js';
 
 const app = express();
@@ -30,9 +30,29 @@ const localIp = getLocalIpAddress();
 // Store active game servers per room
 const activeServers: Map<string, any> = new Map();
 
+// Server-side game initialization - imports server-only code (no Phaser)
+async function initializeGamesServer(): Promise<void> {
+  // Games are registered in order - first gets 'A', second gets 'B', etc.
+  try {
+    // @ts-ignore - Dynamic import resolved at runtime
+    const { game: demoGame } = await import('@games/demo/dist/server-entry.js');
+    registry.register(demoGame);
+  } catch (e) {
+    console.warn('Demo game not available:', e);
+  }
+
+  try {
+    // @ts-ignore - Dynamic import resolved at runtime
+    const { game: sproutLandGame } = await import('@games/sprout-land/dist/server-entry.js');
+    registry.register(sproutLandGame);
+  } catch (e) {
+    console.warn('Sprout Land game not available:', e);
+  }
+}
+
 async function main() {
-  // Initialize all games
-  await initializeGames();
+  // Initialize all games (server-side, no Phaser)
+  await initializeGamesServer();
 
   const games = registry.getAllGames();
   console.log(`Loaded ${games.length} games: ${games.map(g => g.id).join(', ')}`);
