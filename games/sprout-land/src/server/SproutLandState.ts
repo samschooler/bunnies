@@ -51,7 +51,7 @@ export class SproutLandState extends BaseGameState {
   private loadMapData(): void {
     try {
       // Load tilemap from public assets
-      const tilemapPath = join(__dirname, '../../../game-display/public/assets/sprout-land/tilemaps/farm-tilemap.json');
+      const tilemapPath = join(__dirname, '../../assets/tilemaps/farm-tilemap.json');
       const tilemapJson = readFileSync(tilemapPath, 'utf-8');
       const tilemapData: TilemapData = JSON.parse(tilemapJson);
 
@@ -112,8 +112,8 @@ export class SproutLandState extends BaseGameState {
   private loadInteriorMapData(): void {
     try {
       // Use env var for assets path to avoid fragile relative paths
-      const assetsBasePath = process.env.ASSETS_PATH || join(__dirname, '../../../game-display/public/assets');
-      const tilemapPath = join(assetsBasePath, 'sprout-land/tilemaps/house-interior.json');
+      const assetsBasePath = process.env.ASSETS_PATH || join(__dirname, '../../assets');
+      const tilemapPath = join(assetsBasePath, 'tilemaps/house-interior.json');
       const tilemapJson = readFileSync(tilemapPath, 'utf-8');
       const tilemapData: TilemapData = JSON.parse(tilemapJson);
 
@@ -164,8 +164,8 @@ export class SproutLandState extends BaseGameState {
   private loadFieldMapData(): void {
     try {
       // Use env var for assets path to avoid fragile relative paths
-      const assetsBasePath = process.env.ASSETS_PATH || join(__dirname, '../../../game-display/public/assets');
-      const tilemapPath = join(assetsBasePath, 'sprout-land/tilemaps/field-interior.json');
+      const assetsBasePath = process.env.ASSETS_PATH || join(__dirname, '../../assets');
+      const tilemapPath = join(assetsBasePath, 'tilemaps/field-interior.json');
       const tilemapJson = readFileSync(tilemapPath, 'utf-8');
       const tilemapData: TilemapData = JSON.parse(tilemapJson);
 
