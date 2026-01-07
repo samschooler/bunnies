@@ -25,7 +25,7 @@ export default function GameController({ controller, playerName, roomCode, displ
   const [playerState, setPlayerState] = useState<PlayerState>({ coins: 0, size: 1, speed: 1, color: '#ffffff' });
   const [currentMapId, setCurrentMapId] = useState<string>('main');
   const [showStore, setShowStore] = useState(false);
-  const inputIntervalRef = useRef<number | null>(null);
+  const inputIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentInputRef = useRef({ dx: 0, dy: 0 });
 
   useEffect(() => {

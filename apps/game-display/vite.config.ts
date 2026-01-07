@@ -31,8 +31,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@games/demo': path.resolve(__dirname, '../../games/demo/src/client'),
-      '@games/sprout-land': path.resolve(__dirname, '../../games/sprout-land/src/client')
+      '@games/demo': path.resolve(__dirname, '../../games/demo/src/client.ts'),
+      '@games/sprout-land': path.resolve(__dirname, '../../games/sprout-land/src/client.ts')
     }
   },
   plugins: [

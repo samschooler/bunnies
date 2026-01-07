@@ -5,13 +5,22 @@ import {
   PlayerInput
 } from '@party-game/shared-types';
 
+export interface BaseControllerOptions {
+  namespace?: string;
+}
+
 export abstract class BaseController {
   protected socket: Socket<ServerToClientEvents, ClientToServerEvents>;
   protected sessionToken: string | null = null;
   protected playerId: string | null = null;
 
-  constructor(serverUrl: string, roomCode: string) {
-    this.socket = io(serverUrl, {
+  constructor(serverUrl: string, roomCode: string, options: BaseControllerOptions = {}) {
+    // Connect to the namespaced endpoint if provided
+    const socketUrl = options.namespace
+      ? `${serverUrl}${options.namespace}`
+      : serverUrl;
+
+    this.socket = io(socketUrl, {
       query: { roomCode }
     });
 

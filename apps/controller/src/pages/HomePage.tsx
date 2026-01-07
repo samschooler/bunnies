@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './HomePage.css';
 
-export default function HomePage() {
+interface HomePageProps {
+  onJoin: (code: string) => void;
+}
+
+export default function HomePage({ onJoin }: HomePageProps) {
   const [roomCode, setRoomCode] = useState('');
-  const navigate = useNavigate();
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (roomCode.trim()) {
-      navigate(`/${roomCode.toUpperCase()}`);
+      onJoin(roomCode.toUpperCase());
     }
   };
 

@@ -11,7 +11,8 @@ interface PlayerState {
   y?: number;
 }
 
-interface MovementControllerCallbacks {
+interface MovementControllerOptions {
+  namespace?: string;
   onJoined: (playerId: string) => void;
   onSessionRestored: (playerId: string, playerName: string) => void;
   onError: (error: string) => void;
@@ -19,12 +20,12 @@ interface MovementControllerCallbacks {
 }
 
 export class MovementController extends BaseController {
-  private callbacks: MovementControllerCallbacks;
+  private callbacks: MovementControllerOptions;
   private playerState: PlayerState = { coins: 0, size: 1, speed: 1, color: '#ffffff', currentMapId: 'main' };
 
-  constructor(serverUrl: string, roomCode: string, callbacks: MovementControllerCallbacks) {
-    super(serverUrl, roomCode);
-    this.callbacks = callbacks;
+  constructor(serverUrl: string, roomCode: string, options: MovementControllerOptions) {
+    super(serverUrl, roomCode, { namespace: options.namespace });
+    this.callbacks = options;
     this.setupStateListener();
   }
 
