@@ -1,5 +1,6 @@
 // games/demo/src/display/DemoScene.ts
 import Phaser from 'phaser';
+import { StateBuffer } from '@party-game/game-framework';
 
 interface Wall {
   x: number;
@@ -27,6 +28,8 @@ export class DemoScene extends Phaser.Scene {
   private playerSprites: Map<string, Phaser.GameObjects.Container> = new Map();
   private wallGraphics: Phaser.GameObjects.Graphics | null = null;
   private walls: Wall[] = [];
+  private stateBuffer: StateBuffer | null = null;
+  private latestState: GameState | null = null;
 
   constructor() {
     super({ key: 'DemoScene' });
@@ -38,6 +41,30 @@ export class DemoScene extends Phaser.Scene {
 
     // Wall graphics will be drawn when we receive state
     this.wallGraphics = this.add.graphics();
+
+    // Listen for state updates from GameDisplay
+    this.events.on('state-update', (state: GameState) => {
+      this.latestState = state;
+      this.onStateUpdate(state);
+    });
+
+    // Listen for state buffer reference
+    this.events.on('state-buffer', (buffer: StateBuffer) => {
+      this.stateBuffer = buffer;
+    });
+  }
+
+  update(_time: number, _delta: number): void {
+    // Use interpolated state for smooth rendering
+    if (this.stateBuffer) {
+      const interpolated = this.stateBuffer.getInterpolatedState(Date.now());
+      if (interpolated) {
+        this.onRenderPlayers(interpolated.state as unknown as GameState);
+      }
+    } else if (this.latestState) {
+      // Fallback to latest state if no buffer available
+      this.onRenderPlayers(this.latestState);
+    }
   }
 
   private drawBackground(): void {
@@ -81,14 +108,15 @@ export class DemoScene extends Phaser.Scene {
     }
   }
 
-  updateState(state: GameState): void {
+  /** Handle non-position state updates (walls, player add/remove) */
+  private onStateUpdate(state: GameState): void {
     // Update walls if provided
     if (state.gameData?.walls) {
       this.walls = state.gameData.walls;
       this.drawWalls();
     }
 
-    // Update players
+    // Handle player add/remove
     const currentPlayers = new Set(Object.keys(state.players));
 
     // Remove disconnected players
@@ -99,22 +127,28 @@ export class DemoScene extends Phaser.Scene {
       }
     }
 
-    // Update or create players
+    // Create new players (but don't update positions here)
     for (const [id, playerData] of Object.entries(state.players)) {
       if (!playerData.connected) continue;
 
-      let container = this.playerSprites.get(id);
-
-      if (!container) {
-        container = this.createPlayerSprite(playerData);
+      if (!this.playerSprites.has(id)) {
+        const container = this.createPlayerSprite(playerData);
         this.playerSprites.set(id, container);
       }
+    }
+  }
 
-      // Smooth interpolation
-      const targetX = playerData.x;
-      const targetY = playerData.y;
-      container.x += (targetX - container.x) * 0.3;
-      container.y += (targetY - container.y) * 0.3;
+  /** Render player positions from interpolated state - called every frame */
+  private onRenderPlayers(state: GameState): void {
+    for (const [id, playerData] of Object.entries(state.players)) {
+      if (!playerData.connected) continue;
+
+      const container = this.playerSprites.get(id);
+      if (container) {
+        // Direct position update from interpolated state
+        container.x = playerData.x;
+        container.y = playerData.y;
+      }
     }
   }
 

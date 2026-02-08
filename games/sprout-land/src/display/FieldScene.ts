@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameState, STORE_CONFIG } from '@party-game/shared-types';
+import { StateBuffer } from '@party-game/game-framework';
 
 interface MovementPlayerData {
   id: string;
@@ -30,6 +31,8 @@ export class FieldScene extends Phaser.Scene {
   private playerSprites: Map<string, PlayerContainer> = new Map();
   private placedObjectSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private followingPlayerId: string | null = null;
+  private stateBuffer: StateBuffer | null = null;
+  private latestState: GameState | null = null;
 
   constructor() {
     super({ key: 'FieldScene' });
@@ -108,7 +111,28 @@ export class FieldScene extends Phaser.Scene {
     this.createAnimations();
 
     // Setup state update listener
-    this.events.on('state-update', this.handleStateUpdate, this);
+    this.events.on('state-update', (state: GameState) => {
+      this.latestState = state;
+      this.handleStateUpdate(state);
+    });
+
+    // Listen for state buffer reference
+    this.events.on('state-buffer', (buffer: StateBuffer) => {
+      this.stateBuffer = buffer;
+    });
+  }
+
+  update(_time: number, _delta: number): void {
+    // Use interpolated state for smooth rendering
+    if (this.stateBuffer) {
+      const interpolated = this.stateBuffer.getInterpolatedState(Date.now());
+      if (interpolated) {
+        this.renderPlayerPositions(interpolated.state);
+      }
+    } else if (this.latestState) {
+      // Fallback to latest state if no buffer available
+      this.renderPlayerPositions(this.latestState);
+    }
   }
 
   private createAnimations(): void {
@@ -179,13 +203,13 @@ export class FieldScene extends Phaser.Scene {
       p => p.customData.currentMapId && p.customData.currentMapId.startsWith('field-')
     );
 
-    // Update or create player sprites
+    // Create new players and update non-position state
     fieldPlayers.forEach(player => {
-      if (this.playerSprites.has(player.id)) {
-        this.updatePlayerSprite(player);
-      } else {
+      if (!this.playerSprites.has(player.id)) {
         this.createPlayerSprite(player);
       }
+      // Update animation state
+      this.updatePlayerState(player);
     });
 
     // Remove players who left the field
@@ -234,8 +258,7 @@ export class FieldScene extends Phaser.Scene {
         this.placedObjectSprites.delete(id);
       }
     });
-
-    this.updateDepthSorting();
+    // Note: updateDepthSorting is now called in renderPlayerPositions (every frame)
   }
 
   private createPlacedObjectSprite(obj: any): void {
@@ -295,12 +318,10 @@ export class FieldScene extends Phaser.Scene {
     });
   }
 
-  private updatePlayerSprite(player: MovementPlayerData): void {
+  /** Update non-position state (animations, etc.) - called on state updates */
+  private updatePlayerState(player: MovementPlayerData): void {
     const playerSprite = this.playerSprites.get(player.id);
     if (!playerSprite) return;
-
-    playerSprite.container.x = player.customData.x;
-    playerSprite.container.y = player.customData.y;
 
     const vx = player.customData.vx;
     const vy = player.customData.vy;
@@ -328,6 +349,26 @@ export class FieldScene extends Phaser.Scene {
         playerSprite.sprite.play(idleAnim, true);
       }
     }
+  }
+
+  /** Render player positions from interpolated state - called every frame */
+  private renderPlayerPositions(state: GameState): void {
+    const players = state.players as Record<string, MovementPlayerData>;
+
+    // Only render players in field
+    for (const [id, player] of Object.entries(players)) {
+      if (player.customData?.currentMapId?.startsWith('field-')) {
+        const playerSprite = this.playerSprites.get(id);
+        if (playerSprite) {
+          // Update position from interpolated state
+          playerSprite.container.x = player.customData.x;
+          playerSprite.container.y = player.customData.y;
+        }
+      }
+    }
+
+    // Update depth sorting after position changes
+    this.updateDepthSorting();
   }
 
   private updateDepthSorting(): void {

@@ -21,6 +21,7 @@ export abstract class GameServer {
   public gameStates: Map<string, BaseGameState> = new Map();
   protected updateInterval: number = 1000 / 60; // 60fps
   protected updateLoops: Map<string, NodeJS.Timeout> = new Map();
+  private fixedDeltaTime = 1000 / 60;  // 16.67ms
   protected serverIp: string | null = null;
 
   constructor(io: Server, options?: GameServerOptions) {
@@ -206,33 +207,38 @@ export abstract class GameServer {
     console.log(`Socket disconnected: ${socket.id}`);
   }
 
-  private startGameLoop(roomId: string): void {
+  public startGameLoop(roomId: string): void {
     let lastUpdate = Date.now();
+    let accumulator = 0;
 
     const loop = setInterval(() => {
       const now = Date.now();
-      const deltaTime = now - lastUpdate;
+      const frameTime = Math.min(now - lastUpdate, 100); // Cap to avoid spiral of death
       lastUpdate = now;
+      accumulator += frameTime;
 
+      // Run physics in fixed steps
+      while (accumulator >= this.fixedDeltaTime) {
+        const gameState = this.gameStates.get(roomId);
+        if (!gameState) {
+          clearInterval(loop);
+          this.updateLoops.delete(roomId);
+          return;
+        }
+        gameState.update(this.fixedDeltaTime);
+        accumulator -= this.fixedDeltaTime;
+      }
+
+      // Send state after physics steps
       const gameState = this.gameStates.get(roomId);
-      if (!gameState) {
-        clearInterval(loop);
-        this.updateLoops.delete(roomId);
-        return;
-      }
-
-      gameState.update(deltaTime);
-
-      // Send delta updates (60fps)
-      const delta = gameState.getDelta();
-      if (delta) {
-        this.io.to(roomId).emit('state:delta', delta);
-      }
-
-      // Send full state sync (1-2Hz)
-      if (gameState.shouldSendFullSync()) {
-        const fullState = gameState.getFullState();
-        this.io.to(roomId).emit('state:full', fullState);
+      if (gameState) {
+        const delta = gameState.getDelta();
+        if (delta) {
+          this.io.to(roomId).emit('state:delta', delta);
+        }
+        if (gameState.shouldSendFullSync()) {
+          this.io.to(roomId).emit('state:full', gameState.getFullState());
+        }
       }
     }, this.updateInterval);
 

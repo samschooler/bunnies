@@ -123,11 +123,12 @@ export class SproutLandPlayer extends BasePlayer {
   }
 
   handleInput(input: Record<string, any>): void {
-    // Input format: { dx: number, dy: number }
+    // Input format: { timestamp: number, data: { dx: number, dy: number } }
     // Values are -1, 0, or 1
     // We store the input direction for use in update()
-    this.inputDx = input.dx ?? 0;
-    this.inputDy = input.dy ?? 0;
+    const data = input.data || input;
+    this.inputDx = data.dx ?? 0;
+    this.inputDy = data.dy ?? 0;
   }
 
   private inputDx: number = 0;
@@ -196,6 +197,8 @@ export class SproutLandPlayer extends BasePlayer {
   update(deltaTime: number): void {
     // Convert deltaTime from ms to seconds
     const dt = deltaTime / 1000;
+    const oldX = this.x;
+    const oldY = this.y;
 
     // Set velocity directly based on input (no acceleration/friction)
     if (this.inputDx !== 0 || this.inputDy !== 0) {
@@ -239,6 +242,11 @@ export class SproutLandPlayer extends BasePlayer {
         this.vx = 0;
         this.vy = 0;
       }
+    }
+
+    // Mark dirty if position changed
+    if (this.x !== oldX || this.y !== oldY) {
+      this.markDirty();
     }
   }
 

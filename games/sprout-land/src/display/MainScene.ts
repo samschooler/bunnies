@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameState, STORE_CONFIG } from '@party-game/shared-types';
+import { StateBuffer } from '@party-game/game-framework';
 
 interface MovementPlayerData {
   id: string;
@@ -35,6 +36,8 @@ export class MainScene extends Phaser.Scene {
   private placedObjectSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
   private debugGraphics?: Phaser.GameObjects.Graphics;
   private showDebug: boolean = false; // Toggle to show/hide collision boxes
+  private stateBuffer: StateBuffer | null = null;
+  private latestState: GameState | null = null;
 
   constructor() {
     super({ key: 'MainScene' });
@@ -210,7 +213,50 @@ export class MainScene extends Phaser.Scene {
     this.createAnimations();
 
     // Listen for state updates
-    this.events.on('state-update', this.handleStateUpdate, this);
+    this.events.on('state-update', (state: GameState) => {
+      this.latestState = state;
+      this.handleStateUpdate(state);
+    });
+
+    // Listen for state buffer reference
+    this.events.on('state-buffer', (buffer: StateBuffer) => {
+      this.stateBuffer = buffer;
+    });
+  }
+
+  update(_time: number, _delta: number): void {
+    // Use interpolated state for smooth rendering
+    if (this.stateBuffer) {
+      const interpolated = this.stateBuffer.getInterpolatedState(Date.now());
+      if (interpolated) {
+        this.onRenderPlayerPositions(interpolated.state);
+      }
+    } else if (this.latestState) {
+      // Fallback to latest state if no buffer available
+      this.onRenderPlayerPositions(this.latestState);
+    }
+  }
+
+  /** Render player positions from interpolated state - called every frame */
+  private onRenderPlayerPositions(state: GameState): void {
+    const players = state.players as Record<string, MovementPlayerData>;
+
+    // Only render players on main map
+    const mainMapPlayers = Object.values(players).filter(
+      p => !p.customData?.currentMapId || p.customData.currentMapId === 'main'
+    );
+
+    // Update positions for existing players
+    mainMapPlayers.forEach(player => {
+      const playerData = this.playerSprites.get(player.id);
+      if (playerData && player.customData) {
+        // Update position from interpolated state
+        playerData.container.setPosition(player.customData.x, player.customData.y);
+      }
+    });
+
+    // Update depth sorting after position changes
+    this.updateDepthSorting();
   }
 
   private createGrid(): void {
@@ -573,13 +619,13 @@ export class MainScene extends Phaser.Scene {
       p => !p.customData.currentMapId || p.customData.currentMapId === 'main'
     );
 
-    // Update existing and create new
+    // Create new players (but don't update positions here - that happens in update loop)
     mainMapPlayers.forEach(player => {
       if (!this.playerSprites.has(player.id)) {
         this.createPlayerSprite(player);
-      } else {
-        this.updatePlayerSprite(player);
       }
+      // Update non-position state (animations, coins, etc.)
+      this.updatePlayerState(player);
     });
 
     // Remove players who left main map or disconnected
@@ -633,9 +679,7 @@ export class MainScene extends Phaser.Scene {
         this.placedObjectSprites.delete(objId);
       }
     });
-
-    // Update depth sorting for all sprites
-    this.updateDepthSorting();
+    // Note: updateDepthSorting is now called in renderPlayerPositions (every frame)
   }
 
   private createCoin(coin: { id: string, x: number, y: number }): void {
@@ -723,14 +767,12 @@ export class MainScene extends Phaser.Scene {
     });
   }
 
-  private updatePlayerSprite(player: MovementPlayerData): void {
+  /** Update non-position state (animations, coins, etc.) - called on state updates */
+  private updatePlayerState(player: MovementPlayerData): void {
     const playerData = this.playerSprites.get(player.id);
     if (!playerData) return;
 
-    const { container, sprite, coinText, currentDirection } = playerData;
-
-    // Update position directly from server (server handles collision)
-    container.setPosition(player.customData.x, player.customData.y);
+    const { sprite, coinText, currentDirection } = playerData;
 
     // Calculate velocity magnitude
     const speed = Math.sqrt(
@@ -776,6 +818,25 @@ export class MainScene extends Phaser.Scene {
     coinText.setText(`Coins: ${player.customData.coins}`);
 
     // Update opacity based on connection status
-    container.setAlpha(player.connected ? 1 : 0.5);
+    playerData.container.setAlpha(player.connected ? 1 : 0.5);
+  }
+
+  /** Render player positions from interpolated state - called every frame */
+  private renderPlayerPositions(state: GameState): void {
+    const players = state.players as Record<string, MovementPlayerData>;
+
+    // Only render players on main map
+    for (const [id, player] of Object.entries(players)) {
+      if (!player.customData?.currentMapId || player.customData.currentMapId === 'main') {
+        const playerData = this.playerSprites.get(id);
+        if (playerData) {
+          // Update position from interpolated state
+          playerData.container.setPosition(player.customData.x, player.customData.y);
+        }
+      }
+    }
+
+    // Update depth sorting after position changes
+    this.updateDepthSorting();
   }
 }

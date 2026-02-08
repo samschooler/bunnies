@@ -38,19 +38,33 @@ export class DemoPlayer extends BasePlayer {
   }
 
   handleInput(input: Record<string, any>): void {
-    if (input.joystick) {
-      this.vx = input.joystick.x * this.speed;
-      this.vy = input.joystick.y * this.speed;
+    // Input format: { timestamp: number, data: { dx: number, dy: number } }
+    const data = input.data || input;
+    if (data.dx !== undefined || data.dy !== undefined) {
+      this.vx = (data.dx || 0) * this.speed;
+      this.vy = (data.dy || 0) * this.speed;
+    } else if (data.joystick) {
+      // Legacy joystick format
+      this.vx = data.joystick.x * this.speed;
+      this.vy = data.joystick.y * this.speed;
     }
   }
 
   update(deltaTime: number): void {
     const dt = deltaTime / 1000;
+    const oldX = this.x;
+    const oldY = this.y;
+
     this.x += this.vx * dt;
     this.y += this.vy * dt;
 
     // Simple bounds checking (800x600 play area with padding)
     this.x = Math.max(30, Math.min(770, this.x));
     this.y = Math.max(30, Math.min(570, this.y));
+
+    // Mark dirty if position changed
+    if (this.x !== oldX || this.y !== oldY) {
+      this.markDirty();
+    }
   }
 }

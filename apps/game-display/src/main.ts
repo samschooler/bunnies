@@ -34,6 +34,8 @@ class GameDisplay extends BaseGameDisplay {
     const scenes = this.phaserGame.scene.getScenes(true);
     scenes.forEach(scene => {
       scene.events.emit('state-update', state);
+      // Also emit the state buffer reference for interpolation
+      scene.events.emit('state-buffer', this.getStateBuffer());
     });
     this.updatePlayerList(state.players);
   }

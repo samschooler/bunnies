@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameState, STORE_CONFIG } from '@party-game/shared-types';
+import { StateBuffer } from '@party-game/game-framework';
 
 interface MovementPlayerData {
   id: string;
@@ -29,6 +30,8 @@ interface PlayerContainer {
 export class InteriorScene extends Phaser.Scene {
   private playerSprites: Map<string, PlayerContainer> = new Map();
   private placedObjectSprites: Map<string, Phaser.GameObjects.Sprite> = new Map();
+  private stateBuffer: StateBuffer | null = null;
+  private latestState: GameState | null = null;
 
   constructor() {
     super({ key: 'InteriorScene' });
@@ -103,7 +106,28 @@ export class InteriorScene extends Phaser.Scene {
     this.createAnimations();
 
     // Listen for state updates
-    this.events.on('state-update', this.handleStateUpdate, this);
+    this.events.on('state-update', (state: GameState) => {
+      this.latestState = state;
+      this.handleStateUpdate(state);
+    });
+
+    // Listen for state buffer reference
+    this.events.on('state-buffer', (buffer: StateBuffer) => {
+      this.stateBuffer = buffer;
+    });
+  }
+
+  update(_time: number, _delta: number): void {
+    // Use interpolated state for smooth rendering
+    if (this.stateBuffer) {
+      const interpolated = this.stateBuffer.getInterpolatedState(Date.now());
+      if (interpolated) {
+        this.renderPlayerPositions(interpolated.state);
+      }
+    } else if (this.latestState) {
+      // Fallback to latest state if no buffer available
+      this.renderPlayerPositions(this.latestState);
+    }
   }
 
   private createAnimations(): void {
@@ -174,13 +198,13 @@ export class InteriorScene extends Phaser.Scene {
       p => p.customData.currentMapId && p.customData.currentMapId !== 'main'
     );
 
-    // Update existing and create new
+    // Create new players and update non-position state
     interiorPlayers.forEach(player => {
       if (!this.playerSprites.has(player.id)) {
         this.createPlayerSprite(player);
-      } else {
-        this.updatePlayerSprite(player);
       }
+      // Update animation and other non-position state
+      this.updatePlayerState(player);
     });
 
     // Remove players who left interior or disconnected
@@ -215,9 +239,7 @@ export class InteriorScene extends Phaser.Scene {
         this.placedObjectSprites.delete(objId);
       }
     });
-
-    // Update depth sorting for all sprites
-    this.updateDepthSorting();
+    // Note: updateDepthSorting is now called in renderPlayerPositions (every frame)
   }
 
   private createPlacedObjectSprite(obj: any): void {
@@ -291,13 +313,10 @@ export class InteriorScene extends Phaser.Scene {
     });
   }
 
-  private updatePlayerSprite(player: MovementPlayerData): void {
+  /** Update non-position state (animations, etc.) - called on state updates */
+  private updatePlayerState(player: MovementPlayerData): void {
     const playerData = this.playerSprites.get(player.id);
     if (!playerData) return;
-
-    // Update position
-    playerData.container.x = player.customData.x;
-    playerData.container.y = player.customData.y;
 
     // Update animation based on velocity
     const vx = player.customData.vx;
@@ -329,6 +348,26 @@ export class InteriorScene extends Phaser.Scene {
         playerData.sprite.play(idleAnim, true);
       }
     }
+  }
+
+  /** Render player positions from interpolated state - called every frame */
+  private renderPlayerPositions(state: GameState): void {
+    const players = state.players as Record<string, MovementPlayerData>;
+
+    // Only render players in interior
+    for (const [id, player] of Object.entries(players)) {
+      if (player.customData?.currentMapId && player.customData.currentMapId !== 'main') {
+        const playerData = this.playerSprites.get(id);
+        if (playerData) {
+          // Update position from interpolated state
+          playerData.container.x = player.customData.x;
+          playerData.container.y = player.customData.y;
+        }
+      }
+    }
+
+    // Update depth sorting after position changes
+    this.updateDepthSorting();
   }
 
   private updateDepthSorting(): void {

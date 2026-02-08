@@ -88,10 +88,116 @@ async function main() {
         });
         socket.emit('room:code', room.roomCode);
 
+        // Start game loop for this room
+        server.startGameLoop(room.roomId);
+
         console.log(`[${game.id}] Room created: ${roomCode}`);
       });
 
-      // Other events handled by game server
+      socket.on('room:join', (roomCode: string, playerName: string) => {
+        const server = activeServers.get(roomCode);
+        if (!server) {
+          socket.emit('room:error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
+          return;
+        }
+
+        const room = server.roomManager.getRoomByCode(roomCode);
+        if (!room) {
+          socket.emit('room:error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
+          return;
+        }
+
+        const gameState = server.gameStates.get(room.roomId);
+        if (!gameState) {
+          socket.emit('room:error', { code: 'ROOM_NOT_FOUND', message: 'Game state not found' });
+          return;
+        }
+
+        const isDisplay = playerName.startsWith('__DISPLAY__');
+
+        if (isDisplay) {
+          socket.join(room.roomId);
+          (socket as any).roomId = room.roomId;
+          (socket as any).isDisplay = true;
+
+          socket.emit('room:joined', {
+            playerId: '',
+            sessionToken: '',
+            playerData: null,
+            roomCode: roomCode
+          });
+          socket.emit('room:code', roomCode);
+
+          // Send current state to the display
+          socket.emit('state:full', gameState.getFullState());
+
+          console.log(`[${game.id}] Display joined room ${roomCode}`);
+        } else {
+          // Regular player joining
+          const playerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const player = gameState.addPlayer(playerId, playerName);
+
+          socket.join(room.roomId);
+          (socket as any).playerId = playerId;
+          (socket as any).roomId = room.roomId;
+
+          socket.emit('room:joined', {
+            playerId,
+            sessionToken: '',
+            playerData: player.getState(),
+            roomCode: roomCode
+          });
+
+          namespace.to(room.roomId).emit('player:joined', player.getState());
+          console.log(`[${game.id}] Player ${playerName} joined room ${roomCode}`);
+        }
+      });
+
+      // Handle input updates
+      socket.on('input:update', (input) => {
+        const roomId = (socket as any).roomId;
+        const playerId = (socket as any).playerId;
+        if (!roomId || !playerId) return;
+
+        // Find the server for this room
+        for (const [code, server] of activeServers) {
+          const room = server.roomManager.getRoomByCode(code);
+          if (room && room.roomId === roomId) {
+            const gameState = server.gameStates.get(roomId);
+            if (gameState) {
+              const player = gameState.getPlayer(playerId);
+              if (player) {
+                player.handleInput(input);
+              }
+            }
+            break;
+          }
+        }
+      });
+
+      socket.on('disconnect', () => {
+        const roomId = (socket as any).roomId;
+        const playerId = (socket as any).playerId;
+        const isDisplay = (socket as any).isDisplay;
+
+        if (roomId && playerId && !isDisplay) {
+          for (const [code, server] of activeServers) {
+            const room = server.roomManager.getRoomByCode(code);
+            if (room && room.roomId === roomId) {
+              const gameState = server.gameStates.get(roomId);
+              if (gameState) {
+                const player = gameState.getPlayer(playerId);
+                if (player) {
+                  player.connected = false;
+                }
+                namespace.to(roomId).emit('player:left', playerId);
+              }
+              break;
+            }
+          }
+        }
+        console.log(`[${game.id}] Socket disconnected: ${socket.id}`);
+      });
     });
   }
 
