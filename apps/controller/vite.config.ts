@@ -20,6 +20,14 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5174,
       host: true,
+      // Allow access through the Caddy-proxied dev domain
+      allowedHosts: ['bunnies-ctrl.dark.computer'],
+      // HMR websocket runs through Caddy (HTTPS on 443)
+      hmr: {
+        protocol: 'wss',
+        host: 'bunnies-ctrl.dark.computer',
+        clientPort: 443
+      },
       proxy: {
         '/assets': {
           target: displayUrl,

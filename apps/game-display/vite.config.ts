@@ -18,9 +18,17 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Allow access through the Caddy-proxied dev domain
+    allowedHosts: ['bunnies.dark.computer'],
+    // HMR websocket runs through Caddy (HTTPS on 443)
+    hmr: {
+      protocol: 'wss',
+      host: 'bunnies.dark.computer',
+      clientPort: 443
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:7654',
         changeOrigin: true
       }
     }
