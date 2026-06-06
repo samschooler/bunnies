@@ -246,6 +246,11 @@ async function main() {
     // Serve controller app
     app.use('/controller', express.static(path.join(__dirname, '../../controller/dist')));
 
+    // SPA fallback for controller deep links (e.g. /controller/:roomCode from QR codes)
+    app.get('/controller/:roomCode', (req, res) => {
+      res.sendFile(path.join(__dirname, '../../controller/dist/index.html'));
+    });
+
     // Serve display app assets
     app.use('/assets', express.static(path.join(__dirname, '../../game-display/dist/assets')));
 
