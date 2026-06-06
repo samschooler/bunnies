@@ -25,25 +25,14 @@ export default function GameController({ controller, playerName, roomCode, displ
   const [playerState, setPlayerState] = useState<PlayerState>({ coins: 0, size: 1, speed: 1, color: '#ffffff' });
   const [currentMapId, setCurrentMapId] = useState<string>('main');
   const [showStore, setShowStore] = useState(false);
-  const inputIntervalRef = useRef<number | null>(null);
   const currentInputRef = useRef({ dx: 0, dy: 0 });
+  const lastSentInputRef = useRef({ dx: 0, dy: 0 });
 
   useEffect(() => {
-    // Send input at 30fps
-    inputIntervalRef.current = setInterval(() => {
-      controller.sendInput(currentInputRef.current);
-    }, 1000 / 30);
-
     // Setup state update callback
     (controller as any).callbacks.onStateUpdate = (state: PlayerState) => {
       setPlayerState(state);
       setCurrentMapId(state.currentMapId || 'main');
-    };
-
-    return () => {
-      if (inputIntervalRef.current) {
-        clearInterval(inputIntervalRef.current);
-      }
     };
   }, [controller]);
 
@@ -63,7 +52,13 @@ export default function GameController({ controller, playerName, roomCode, displ
     }
 
     currentInputRef.current = { dx, dy };
-  }, [activeDirections]);
+
+    // Only send if input actually changed
+    if (dx !== lastSentInputRef.current.dx || dy !== lastSentInputRef.current.dy) {
+      lastSentInputRef.current = { dx, dy };
+      controller.sendInput({ dx, dy });
+    }
+  }, [activeDirections, controller]);
 
   useEffect(() => {
     // Only enable keyboard controls when store is closed

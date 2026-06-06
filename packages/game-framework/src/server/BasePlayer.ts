@@ -6,6 +6,7 @@ export abstract class BasePlayer {
   public color: string;
   public connected: boolean;
   public joinedAt: number;
+  protected _dirty = true;
 
   constructor(id: string, name: string, color: string) {
     this.id = id;
@@ -13,6 +14,18 @@ export abstract class BasePlayer {
     this.color = color;
     this.connected = true;
     this.joinedAt = Date.now();
+  }
+
+  isDirty(): boolean {
+    return this._dirty;
+  }
+
+  clearDirty(): void {
+    this._dirty = false;
+  }
+
+  protected markDirty(): void {
+    this._dirty = true;
   }
 
   abstract getState(): PlayerData;

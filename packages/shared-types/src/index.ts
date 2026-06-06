@@ -5,3 +5,5 @@ export * from './room.js';
 export * from './storeConfig.js';
 export { URLBuilder, type EnvironmentConfig } from './urlBuilder.js';
 export * from './MapCollision.js';
+export * from './game-registry.js';
+export * from './games.js';

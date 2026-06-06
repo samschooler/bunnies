@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import { URLBuilder } from '@party-game/shared-types';
 import { MovementController } from '../game/MovementController';
 import NameEntry from '../components/NameEntry';
 import GameController from '../components/GameController';
 import './ControllerPage.css';
 
-export default function ControllerPage() {
-  const { roomCode } = useParams<{ roomCode: string }>();
+interface ControllerPageProps {
+  roomCode: string;
+  gameId: string;
+}
+
+export default function ControllerPage({ roomCode, gameId }: ControllerPageProps) {
   const [controller, setController] = useState<MovementController | null>(null);
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
@@ -15,7 +18,7 @@ export default function ControllerPage() {
   const [displayUrl, setDisplayUrl] = useState<string>('');
 
   useEffect(() => {
-    if (!roomCode) return;
+    if (!roomCode || !gameId) return;
 
     const urlBuilder = new URLBuilder({
       serverUrl: import.meta.env.VITE_GAME_SERVER_URL,
@@ -24,7 +27,10 @@ export default function ControllerPage() {
     });
     const serverUrl = urlBuilder.getServerUrl();
     setDisplayUrl(urlBuilder.getDisplayUrl());
+
+    // Connect to the game-specific namespace
     const ctrl = new MovementController(serverUrl, roomCode, {
+      namespace: `/${gameId}`,
       onJoined: (id) => {
         setPlayerId(id);
         setError(null);
@@ -46,7 +52,7 @@ export default function ControllerPage() {
     return () => {
       ctrl.disconnect();
     };
-  }, [roomCode]);
+  }, [roomCode, gameId]);
 
   const handleNameSubmit = (name: string) => {
     if (controller && roomCode) {

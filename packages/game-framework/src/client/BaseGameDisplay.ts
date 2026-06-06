@@ -5,12 +5,14 @@ import {
   GameState,
   StateDelta
 } from '@party-game/shared-types';
+import { StateBuffer } from './StateBuffer.js';
 
 export abstract class BaseGameDisplay {
   protected socket: Socket<ServerToDisplayEvents, ClientToServerEvents>;
   protected roomCode: string | null = null;
   protected currentState: GameState | null = null;
   protected serverNetworkIp: string | null = null;
+  protected stateBuffer: StateBuffer = new StateBuffer(50);
 
   constructor(serverUrl: string) {
     this.socket = io(serverUrl);
@@ -47,12 +49,16 @@ export abstract class BaseGameDisplay {
 
     this.socket.on('state:full', (state) => {
       this.currentState = state;
+      // Deep copy for buffer - state object may be mutated by delta
+      this.stateBuffer.push(JSON.parse(JSON.stringify(state)));
       this.onStateUpdate(state);
     });
 
     this.socket.on('state:delta', (delta) => {
       if (this.currentState) {
         this.applyDelta(delta);
+        // Deep copy for buffer - state object will be mutated by next delta
+        this.stateBuffer.push(JSON.parse(JSON.stringify(this.currentState)));
         this.onStateUpdate(this.currentState);
       }
     });
@@ -105,5 +111,9 @@ export abstract class BaseGameDisplay {
 
   disconnect(): void {
     this.socket.disconnect();
+  }
+
+  getStateBuffer(): StateBuffer {
+    return this.stateBuffer;
   }
 }

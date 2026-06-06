@@ -50,28 +50,19 @@ export abstract class BaseGameState {
   }
 
   getDelta(): StateDelta | null {
-    const currentState = this.getFullState();
-
-    if (!this.previousState) {
-      this.previousState = currentState;
-      return null;
-    }
-
     const delta: StateDelta = {
-      timestamp: currentState.timestamp
+      timestamp: Date.now()
     };
 
-    // Calculate player deltas
+    // Calculate player deltas using dirty flags
     const playerDeltas: Partial<Record<string, Partial<PlayerData>>> = {};
     let hasPlayerChanges = false;
 
-    Object.keys(currentState.players).forEach(playerId => {
-      const current = currentState.players[playerId];
-      const previous = this.previousState!.players[playerId];
-
-      if (!previous || this.hasPlayerChanged(current, previous)) {
-        playerDeltas[playerId] = current;
+    this.players.forEach((player, playerId) => {
+      if (player.isDirty()) {
+        playerDeltas[playerId] = player.getState();
         hasPlayerChanges = true;
+        player.clearDirty();
       }
     });
 
@@ -79,29 +70,30 @@ export abstract class BaseGameState {
       delta.players = playerDeltas;
     }
 
-    // Calculate game data deltas (deep comparison to detect array mutations)
+    // Calculate game data deltas (keep JSON comparison for now, less frequent)
+    const currentGameData = this.getGameData();
     const gameDataDeltas: Partial<Record<string, any>> = {};
     let hasGameDataChanges = false;
 
-    Object.keys(currentState.gameData).forEach(key => {
-      if (JSON.stringify(currentState.gameData[key]) !== JSON.stringify(this.previousState!.gameData[key])) {
-        gameDataDeltas[key] = currentState.gameData[key];
+    if (!this.previousState) {
+      this.previousState = this.getFullState();
+    }
+
+    Object.keys(currentGameData).forEach(key => {
+      if (JSON.stringify(currentGameData[key]) !== JSON.stringify(this.previousState!.gameData[key])) {
+        gameDataDeltas[key] = currentGameData[key];
         hasGameDataChanges = true;
       }
     });
 
     if (hasGameDataChanges) {
       delta.gameData = gameDataDeltas;
+      // Update previousState gameData for next comparison
+      this.previousState = this.getFullState();
     }
-
-    this.previousState = currentState;
 
     // Return null if no changes
     return (hasPlayerChanges || hasGameDataChanges) ? delta : null;
-  }
-
-  private hasPlayerChanged(current: PlayerData, previous: PlayerData): boolean {
-    return JSON.stringify(current) !== JSON.stringify(previous);
   }
 
   shouldSendFullSync(): boolean {
