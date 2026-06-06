@@ -100,7 +100,10 @@ async function main() {
   if (pathParts[0] === 'room' && pathParts[1]) {
     const parsed = registry.parseRoomCode(pathParts[1]);
     if (parsed) {
-      await bootGame(parsed.gameId, parsed.roomCode, urlBuilder);
+      // Optional ?scene= boots a specific scene instead of the entry scene.
+      // Used by the controller's embedded interior/field iframe.
+      const startScene = new URLSearchParams(window.location.search).get('scene');
+      await bootGame(parsed.gameId, parsed.roomCode, urlBuilder, startScene);
     } else {
       showNotFound('Invalid room code');
     }
@@ -128,7 +131,7 @@ async function main() {
   showNotFound('Game not found');
 }
 
-async function bootGame(gameId: string, roomCode: string | null, urlBuilder: URLBuilder) {
+async function bootGame(gameId: string, roomCode: string | null, urlBuilder: URLBuilder, startScene: string | null = null) {
   const game = registry.getGame(gameId);
   if (!game) {
     showNotFound('Game not found');
@@ -150,8 +153,13 @@ async function bootGame(gameId: string, roomCode: string | null, urlBuilder: URL
 
   const phaserGame = new Phaser.Game(config);
 
-  // Start the entry scene
-  phaserGame.scene.start(game.entryScene);
+  // Start the requested scene if it's a valid registered scene (e.g. the
+  // controller's embedded interior/field iframe), else the game's entry scene.
+  const sceneToStart =
+    startScene && phaserGame.scene.getScene(startScene)
+      ? startScene
+      : game.entryScene;
+  phaserGame.scene.start(sceneToStart);
 
   // Create game display with socket.io connection
   const serverUrl = urlBuilder.getServerUrl() + `/${gameId}`;

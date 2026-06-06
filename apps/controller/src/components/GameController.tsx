@@ -213,7 +213,7 @@ export default function GameController({ controller, playerName, roomCode, displ
       {currentMapId.startsWith('interior-') && (
         <div className="interior-display">
           <iframe
-            src={`${displayUrl}/interior.html?roomCode=${roomCode}`}
+            src={`${displayUrl}/room/${roomCode}?scene=InteriorScene`}
             className="mini-display-frame"
             title="House Interior"
           />
@@ -223,7 +223,7 @@ export default function GameController({ controller, playerName, roomCode, displ
       {currentMapId.startsWith('field-') && (
         <div className="interior-display">
           <iframe
-            src={`${displayUrl}/field.html?roomCode=${roomCode}`}
+            src={`${displayUrl}/room/${roomCode}?scene=FieldScene`}
             className="mini-display-frame"
             title="Field"
           />
